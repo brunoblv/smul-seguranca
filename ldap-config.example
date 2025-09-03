@@ -1,0 +1,42 @@
+# Configurações do Servidor LDAP - Active Directory
+# Copie este arquivo para .env.local e ajuste as configurações
+
+# Servidor LDAP (IP ou hostname)
+LDAP_SERVER="ldap://10.10.65.242"
+
+# Domínio (formato @dominio.com)
+LDAP_DOMAIN="@rede.sp"
+
+# Base DN (formato DC=dominio,DC=com)
+LDAP_BASE="DC=rede,DC=sp"
+
+# Usuário para autenticação
+LDAP_USER="usr_smdu_freenas"
+
+# Senha do usuário
+LDAP_PASS="Prodam01"
+
+# Exemplos para outros ambientes:
+
+# Active Directory (Windows Server) - Formato alternativo
+# LDAP_SERVER="ldap://dc01.empresa.local:389"
+# LDAP_DOMAIN="@empresa.local"
+# LDAP_BASE="DC=empresa,DC=local"
+# LDAP_USER="usuario_admin"
+# LDAP_PASS="senha_admin"
+
+# OpenLDAP
+# LDAP_SERVER="ldap://ldap.empresa.com:389"
+# LDAP_DOMAIN=""
+# LDAP_BASE="dc=empresa,dc=com"
+# LDAP_USER="cn=admin,dc=empresa,dc=com"
+# LDAP_PASS="senha_admin"
+
+# Apache Directory Server
+# LDAP_SERVER="ldap://localhost:10389"
+# LDAP_DOMAIN=""
+# LDAP_BASE="dc=example,dc=com"
+# LDAP_USER="uid=admin,ou=system"
+# LDAP_PASS="secret"
+
+
