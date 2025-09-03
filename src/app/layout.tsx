@@ -45,6 +45,12 @@ export default function RootLayout({
               >
                 Consulta em Lote
               </a>
+              <a
+                href="/usuarios-inativos"
+                className="transition-colors hover:text-gray-900 text-gray-600"
+              >
+                Usuários Inativos
+              </a>
             </nav>
           </div>
         </header>
