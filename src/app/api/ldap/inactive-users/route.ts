@@ -57,19 +57,27 @@ function convertADTimestamp(timestamp: string): Date | null {
     if (isNaN(adTimestamp) || adTimestamp === 0) {
       return null;
     }
-    
+
     // Converter para segundos Unix
-    const unixTimestamp = (adTimestamp / 10000000) - 11644473600;
-    
+    const unixTimestamp = adTimestamp / 10000000 - 11644473600;
+
     // Verificar se o timestamp é válido (não muito antigo ou futuro)
-    if (unixTimestamp < 0 || unixTimestamp > Date.now() / 1000 + 86400 * 365 * 10) {
+    if (
+      unixTimestamp < 0 ||
+      unixTimestamp > Date.now() / 1000 + 86400 * 365 * 10
+    ) {
       console.log(`Timestamp inválido: ${timestamp} -> ${unixTimestamp}`);
       return null;
     }
-    
+
     return new Date(unixTimestamp * 1000);
   } catch (error) {
-    console.error("Erro ao converter timestamp AD:", error, "timestamp:", timestamp);
+    console.error(
+      "Erro ao converter timestamp AD:",
+      error,
+      "timestamp:",
+      timestamp
+    );
     return null;
   }
 }
@@ -117,7 +125,7 @@ async function searchUsersInOU(
       const users: InactiveUser[] = [];
       const searchOptions: any = {
         scope: "sub" as any,
-        filter: `(&(objectClass=user)(lastLogonTimestamp=*))`, // Só usuários com lastLogonTimestamp (como no PHP)
+        filter: `(&(objectClass=user)(objectCategory=person)(lastLogonTimestamp=*)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))`, // Só usuários reais ativos com lastLogonTimestamp
         attributes: [
           "sAMAccountName",
           "displayName",
