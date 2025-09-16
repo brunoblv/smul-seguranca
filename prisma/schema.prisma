@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-    provider = "sqlite"
-    url      = "file:./data/usuarios_inativos.db"
+    provider = "mysql"
+    url      = env("DATABASE_URL")
 }
 
 model UsuarioInativo {
@@ -119,6 +119,7 @@ model Ticket {
     status_sgu       StatusSGU    @default(NAO_ENCONTRADO)
     setor_sgu        String?
     status_ticket    StatusTicket @default(PENDENTE)
+    fechado          Boolean      @default(false)
     observacoes      String?
     data_criacao     DateTime     @default(now())
     data_atualizacao DateTime     @updatedAt
@@ -129,6 +130,7 @@ model Ticket {
     @@index([status_ldap])
     @@index([status_sgu])
     @@index([status_ticket])
+    @@index([fechado])
     @@index([dias_sem_logar])
     @@map("tickets")
 }
@@ -154,6 +156,8 @@ enum StatusTicket {
     EXCLUIR
     MANTER
     TRANSFERIR
+    TRANSFERIDO
+    PRESTANDO_SERVICO_OUTRO_ORGAO
     BLOQUEAR
     DESBLOQUEAR
 

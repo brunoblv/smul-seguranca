@@ -2,7 +2,7 @@
 .sticky-table-container {
   position: relative;
   overflow-x: auto;
-  height: 600px;
+  max-height: 80vh;
   overflow-y: auto;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
@@ -14,6 +14,7 @@
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
+  font-size: 0.75rem;
 }
 
 .sticky-header {
@@ -30,13 +31,14 @@
   z-index: 30;
   background-color: #f9fafb;
   border-bottom: 2px solid #e5e7eb;
-  padding: 0.75rem 1rem;
+  padding: 0.375rem 1rem;
   text-align: left;
   font-weight: 600;
   color: #374151;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  height: 32px;
 }
 
 .sticky-header th:hover {
@@ -45,9 +47,10 @@
 
 /* Garantir que as células do body tenham o mesmo padding */
 .sticky-table tbody td {
-  padding: 0.75rem 1rem;
+  padding: 0.375rem 1rem;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: top;
+  height: 32px;
 }
 
 .sticky-table tbody tr:hover {

@@ -1,54 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Lista fixa de OUs do sistema SMUL
-const SMUL_OUS = [
-  "ADESAMPA",
-  "AHM",
-  "AMLURB",
-  "CET",
-  "CGM",
-  "CMSP",
-  "COHAB",
-  "FPETC",
-  "FTM",
-  "GIPB",
-  "HSPM",
-  "ILUME",
-  "IPREM",
-  "PGM",
-  "PRODAM",
-  "SECOM",
-  "SEHAB",
-  "SEME",
-  "SF",
-  "SFMSP",
-  "AGM",
-  "SIURB",
-  "SMADS",
-  "SMC",
-  "SMDET",
-  "SMDHC",
-  "SMDP",
-  "SME",
-  "SMG",
-  "SMIT",
-  "SMJ",
-  "SMPED",
-  "SMRG",
-  "SMRI",
-  "SMS",
-  "SMSP",
-  "SMSU",
-  "SMT",
-  "SMTUR",
-  "SMUL",
-  "SPDA",
-  "SPREGULA",
-  "SPTRANS",
-  "SPTURIS",
-  "SPURBANISMO",
-  "SVMA",
-  "TCMSP",
+// Sistema agora pesquisa em toda a rede SP - não há mais OUs específicas
+const REDE_SP_OUS = [
+  "REDE_SP", // Indica busca em toda a rede SP
 ];
 
 interface OU {
@@ -59,24 +13,25 @@ interface OU {
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("Retornando lista fixa de OUs do SMUL...");
+    console.log(
+      "Sistema agora pesquisa em toda a rede SP - sem filtro de OUs..."
+    );
 
-    // Converte a lista de nomes para o formato esperado
-    const ous: OU[] = SMUL_OUS.map((ouName) => ({
-      dn: `OU=${ouName},DC=rede,DC=sp`,
+    // Retorna apenas uma opção indicando busca em toda a rede SP
+    const ous: OU[] = REDE_SP_OUS.map((ouName) => ({
+      dn: `DC=rede,DC=sp`,
       name: ouName,
-      description: `Organização ${ouName} - SMUL`,
+      description: `Busca em toda a rede SP - sem filtro de OUs`,
     }));
 
-    // Ordena por nome
-    ous.sort((a, b) => a.name.localeCompare(b.name));
-
-    console.log(`Retornando ${ous.length} OUs do SMUL`);
+    console.log(`Sistema configurado para busca em toda a rede SP`);
 
     return NextResponse.json({
       ous,
       total: ous.length,
-      source: "SMUL_OUS_LIST",
+      source: "REDE_SP_SEARCH",
+      message:
+        "Sistema configurado para pesquisar em toda a rede SP sem filtro de OUs",
     });
   } catch (error) {
     console.error("Erro na API de listagem de OUs:", error);

@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const status_ldap = searchParams.get("status_ldap");
     const status_sgu = searchParams.get("status_sgu");
     const dias_sem_logar_min = searchParams.get("dias_sem_logar_min");
+    const fechado = searchParams.get("fechado");
     const username = searchParams.get("username");
 
     // Se foi especificado um username, buscar ticket específico
@@ -44,6 +45,8 @@ export async function GET(request: NextRequest) {
     if (status_sgu) filtros.status_sgu = status_sgu;
     if (dias_sem_logar_min)
       filtros.dias_sem_logar_min = parseInt(dias_sem_logar_min);
+    if (fechado !== null && fechado !== "")
+      filtros.fechado = fechado === "true";
 
     const tickets = await listarTickets(filtros);
 
@@ -65,16 +68,46 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PUT - Atualizar status do ticket
+// PUT - Atualizar status do ticket ou fechar
 export async function PUT(request: NextRequest) {
   try {
-    const { username, status_ticket, observacoes } = await request.json();
+    const { username, status_ticket, observacoes, fechado } =
+      await request.json();
 
-    if (!username || !status_ticket) {
+    if (!username) {
       return NextResponse.json(
         {
           success: false,
-          message: "Username e status_ticket são obrigatórios",
+          message: "Username é obrigatório",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Se está fechando o ticket
+    if (fechado !== undefined) {
+      const ticket = await atualizarStatusTicket(
+        username,
+        status_ticket || "PENDENTE",
+        observacoes,
+        fechado
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: fechado
+          ? "Ticket fechado com sucesso"
+          : "Ticket reaberto com sucesso",
+        data: ticket,
+      });
+    }
+
+    // Se está atualizando status
+    if (!status_ticket) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Status do ticket é obrigatório",
         },
         { status: 400 }
       );

@@ -62,6 +62,7 @@ export async function criarOuAtualizarTicket(
         status_sgu: ticketData.status_sgu,
         setor_sgu: ticketData.setor_sgu,
         status_ticket: ticketData.status_ticket || StatusTicket.PENDENTE,
+        fechado: ticketData.fechado || false,
         observacoes: ticketData.observacoes,
         servidor_origem: ticketData.servidor_origem,
         ou_origem: ticketData.ou_origem,
@@ -79,6 +80,7 @@ export async function criarOuAtualizarTicket(
         status_sgu: ticketData.status_sgu,
         setor_sgu: ticketData.setor_sgu,
         status_ticket: ticketData.status_ticket || StatusTicket.PENDENTE,
+        fechado: ticketData.fechado || false,
         observacoes: ticketData.observacoes,
         servidor_origem: ticketData.servidor_origem,
         ou_origem: ticketData.ou_origem,
@@ -114,6 +116,7 @@ export async function listarTickets(filtros?: {
   status_ldap?: StatusLDAP;
   status_sgu?: StatusSGU;
   dias_sem_logar_min?: number;
+  fechado?: boolean;
 }): Promise<any[]> {
   try {
     const where: any = {};
@@ -136,6 +139,10 @@ export async function listarTickets(filtros?: {
       };
     }
 
+    if (filtros?.fechado !== undefined) {
+      where.fechado = filtros.fechado;
+    }
+
     const tickets = await prisma.ticket.findMany({
       where,
       orderBy: {
@@ -154,18 +161,28 @@ export async function listarTickets(filtros?: {
 export async function atualizarStatusTicket(
   username: string,
   status_ticket: StatusTicket,
-  observacoes?: string
+  observacoes?: string,
+  fechado?: boolean
 ): Promise<any> {
   try {
+    const updateData: any = {
+      status_ticket: status_ticket,
+      data_atualizacao: new Date(),
+    };
+
+    if (observacoes !== undefined) {
+      updateData.observacoes = observacoes;
+    }
+
+    if (fechado !== undefined) {
+      updateData.fechado = fechado;
+    }
+
     const ticket = await prisma.ticket.update({
       where: {
         username: username,
       },
-      data: {
-        status_ticket: status_ticket,
-        observacoes: observacoes,
-        data_atualizacao: new Date(),
-      },
+      data: updateData,
     });
 
     return ticket;

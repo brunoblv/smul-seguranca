@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       username: username,
       nome: ldapInfo.nome || "Não encontrado",
       email: ldapInfo.email,
-      departamento: ldapInfo.departamento,
+      departamento: ldapInfo.empresa, // Usar empresa em vez de departamento
       empresa: ldapInfo.empresa,
       status_ldap: ldapInfo.status_ldap,
       ultimo_login: ldapInfo.ultimo_login,

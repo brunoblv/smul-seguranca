@@ -35,7 +35,6 @@ interface InactiveUser {
 }
 
 interface InactiveUsersRequest {
-  ou: string;
   inactiveDays: 30 | 45 | 60;
 }
 
@@ -98,12 +97,13 @@ function calculateDaysInactive(lastLogon?: string): number {
   }
 }
 
-async function searchUsersInOU(
-  serverUrl: string,
-  ou: string
+async function searchUsersInNetwork(
+  serverUrl: string
 ): Promise<InactiveUser[]> {
   return new Promise((resolve, reject) => {
-    console.log(`Conectando ao servidor ${serverUrl} para OU ${ou}`);
+    console.log(
+      `Conectando ao servidor ${serverUrl} para busca em toda a rede SP`
+    );
 
     const client = ldap.createClient({
       url: serverUrl,
@@ -117,7 +117,6 @@ async function searchUsersInOU(
       : process.env.LDAP_USER?.includes("@")
       ? process.env.LDAP_USER
       : `${process.env.LDAP_USER}@${process.env.LDAP_DOMAIN?.replace("@", "")}`;
-    const escapedOU = escapeFilterValue(ou);
 
     client.bind(bindDN, process.env.LDAP_PASS || "", (err) => {
       if (err) {
@@ -143,17 +142,19 @@ async function searchUsersInOU(
           "pwdLastSet",
           "whenCreated",
         ],
-        sizeLimit: 1000, // Limite de 1000 usuários por servidor
+        sizeLimit: 2000, // Aumentado para 2000 usuários por servidor
       };
 
       console.log(
-        `Executando busca no servidor ${serverUrl} com filtro: ${searchOptions.filter}`
+        `Executando busca no servidor ${serverUrl} em toda a rede SP com filtro: ${searchOptions.filter}`
       );
 
-      client.search(ou, searchOptions, (err, res) => {
+      // Usar a base DN da rede SP em vez de OU específica
+      const baseDN = process.env.LDAP_BASE || "DC=rede,DC=sp";
+      client.search(baseDN, searchOptions, (err, res) => {
         if (err) {
           console.error(
-            `Erro na busca de usuários em ${serverUrl} (${ou}):`,
+            `Erro na busca de usuários em ${serverUrl}:`,
             err.message
           );
           client.destroy();
@@ -211,7 +212,7 @@ async function searchUsersInOU(
             department: department || undefined,
             lastLogon,
             daysInactive,
-            ou,
+            ou: "REDE_SP", // Indica que é de toda a rede SP
             server: serverUrl,
           });
         });
@@ -219,12 +220,12 @@ async function searchUsersInOU(
         res.on("error", (err) => {
           if (err.message.includes("Size Limit Exceeded")) {
             console.log(
-              `Servidor ${serverUrl}: OU ${ou} tem muitos usuários (limite excedido). Retornando usuários encontrados até o limite.`
+              `Servidor ${serverUrl}: Rede SP tem muitos usuários (limite excedido). Retornando usuários encontrados até o limite.`
             );
             // Não resolve com array vazio, deixa os usuários já encontrados
           } else {
             console.error(
-              `Erro na busca de usuários em ${serverUrl} (${ou}):`,
+              `Erro na busca de usuários em ${serverUrl}:`,
               err.message
             );
           }
@@ -344,11 +345,11 @@ async function findLatestLoginForUser(
 export async function POST(request: NextRequest) {
   try {
     const body: InactiveUsersRequest = await request.json();
-    const { ou, inactiveDays } = body;
+    const { inactiveDays } = body;
 
-    if (!ou || !inactiveDays) {
+    if (!inactiveDays) {
       return NextResponse.json(
-        { error: "OU e dias inativos são obrigatórios" },
+        { error: "Dias inativos é obrigatório" },
         { status: 400 }
       );
     }
@@ -361,13 +362,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(
-      `Buscando usuários inativos há mais de ${inactiveDays} dias na OU: ${ou}`
+      `Buscando usuários inativos há mais de ${inactiveDays} dias em toda a rede SP`
     );
     console.log(`Servidores LDAP a serem consultados: ${LDAP_SERVERS.length}`);
 
-    // Busca usuários em todos os servidores
+    // Busca usuários em todos os servidores da rede SP
     const searchPromises = LDAP_SERVERS.map((server) =>
-      searchUsersInOU(server, ou)
+      searchUsersInNetwork(server)
     );
     const results = await Promise.all(searchPromises);
 

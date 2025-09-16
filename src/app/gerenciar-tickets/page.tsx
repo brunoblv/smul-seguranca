@@ -36,6 +36,7 @@ interface Ticket {
   status_sgu: string;
   setor_sgu?: string;
   status_ticket: string;
+  fechado: boolean;
   observacoes?: string;
   data_criacao: string;
   data_atualizacao: string;
@@ -65,10 +66,11 @@ export default function GerenciarTickets() {
     status_ldap: "",
     status_sgu: "",
     dias_sem_logar_min: "",
+    fechado: "false", // Por padrão, mostrar apenas não fechados
   });
   const [pesquisaIndividual, setPesquisaIndividual] = useState("");
   const [pesquisaLote, setPesquisaLote] = useState("");
-  const [itemsPerPage] = useState(20);
+  // Removido limite de itens - mostrar todos os tickets
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
 
@@ -86,6 +88,7 @@ export default function GerenciarTickets() {
       if (filtros.status_sgu) params.append("status_sgu", filtros.status_sgu);
       if (filtros.dias_sem_logar_min)
         params.append("dias_sem_logar_min", filtros.dias_sem_logar_min);
+      if (filtros.fechado) params.append("fechado", filtros.fechado);
 
       const [ticketsRes, estatisticasRes] = await Promise.all([
         fetch(`/api/tickets?${params.toString()}`),
@@ -203,6 +206,36 @@ export default function GerenciarTickets() {
     }
   };
 
+  // Fechar ticket
+  const fecharTicket = async (username: string) => {
+    if (!confirm("Tem certeza que deseja fechar este ticket?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/tickets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          fechado: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert("Ticket fechado com sucesso!");
+        carregarDados();
+      } else {
+        alert(`Erro: ${data.message}`);
+      }
+    } catch (error) {
+      console.error("Erro ao fechar ticket:", error);
+      alert("Erro ao fechar ticket");
+    }
+  };
+
   // Função para obter cor do badge baseado no status
   const getStatusColor = (status: string, type: "ldap" | "sgu" | "ticket") => {
     const colors = {
@@ -221,6 +254,9 @@ export default function GerenciarTickets() {
         EXCLUIR: "border-red-200 bg-red-50 text-red-700",
         MANTER: "border-green-200 bg-green-50 text-green-700",
         TRANSFERIR: "border-blue-200 bg-blue-50 text-blue-700",
+        TRANSFERIDO: "border-cyan-200 bg-cyan-50 text-cyan-700",
+        PRESTANDO_SERVICO_OUTRO_ORGAO:
+          "border-indigo-200 bg-indigo-50 text-indigo-700",
         BLOQUEAR: "border-orange-200 bg-orange-50 text-orange-700",
         DESBLOQUEAR: "border-purple-200 bg-purple-50 text-purple-700",
       },
@@ -229,8 +265,8 @@ export default function GerenciarTickets() {
     return colors[type][status] || "border-gray-200 bg-gray-50 text-gray-700";
   };
 
-  // Mostrar todos os tickets (limitado a 20 para performance)
-  const currentTickets = tickets.slice(0, itemsPerPage);
+  // Mostrar todos os tickets
+  const currentTickets = tickets;
 
   // Detectar se há scroll disponível
   useEffect(() => {
@@ -385,7 +421,7 @@ export default function GerenciarTickets() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Select
               value={filtros.status_ticket || "todos"}
               onValueChange={(value) =>
@@ -404,6 +440,10 @@ export default function GerenciarTickets() {
                 <SelectItem value="EXCLUIR">Excluir</SelectItem>
                 <SelectItem value="MANTER">Manter</SelectItem>
                 <SelectItem value="TRANSFERIR">Transferir</SelectItem>
+                <SelectItem value="TRANSFERIDO">Transferido</SelectItem>
+                <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
+                  Prestando serviço em outro órgão
+                </SelectItem>
                 <SelectItem value="BLOQUEAR">Bloquear</SelectItem>
                 <SelectItem value="DESBLOQUEAR">Desbloquear</SelectItem>
               </SelectContent>
@@ -457,6 +497,25 @@ export default function GerenciarTickets() {
                 setFiltros({ ...filtros, dias_sem_logar_min: e.target.value })
               }
             />
+
+            <Select
+              value={filtros.fechado || "false"}
+              onValueChange={(value) =>
+                setFiltros({
+                  ...filtros,
+                  fechado: value === "todos" ? "" : value,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Status do Ticket" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="false">Abertos</SelectItem>
+                <SelectItem value="true">Fechados</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -467,8 +526,7 @@ export default function GerenciarTickets() {
           <div className="flex justify-between items-center">
             <CardTitle>Tickets ({tickets.length})</CardTitle>
             <div className="text-sm text-gray-500">
-              Mostrando {Math.min(itemsPerPage, tickets.length)} de{" "}
-              {tickets.length} tickets
+              Mostrando {tickets.length} tickets
             </div>
           </div>
         </CardHeader>
@@ -484,7 +542,7 @@ export default function GerenciarTickets() {
                     <th className="w-[150px]">Status SGU</th>
                     <th className="w-[150px]">Status Ticket</th>
                     <th className="w-[150px]">Último Login / Dias Inativo</th>
-                    <th className="w-[150px]">Departamento</th>
+                    <th className="w-[150px]">Empresa</th>
                     <th className="w-[150px]">Setor SGU</th>
                     <th className="w-[200px]">Ações</th>
                   </tr>
@@ -506,12 +564,14 @@ export default function GerenciarTickets() {
                         <td className="font-medium">{ticket.id}</td>
                         <td>
                           <div>
-                            <div className="font-medium">{ticket.nome}</div>
-                            <div className="text-sm text-gray-500">
+                            <div className="font-medium text-sm">
+                              {ticket.nome}
+                            </div>
+                            <div className="text-xs text-gray-500">
                               @{ticket.username}
                             </div>
                             {ticket.email && (
-                              <div className="text-sm text-gray-500">
+                              <div className="text-xs text-gray-500">
                                 {ticket.email}
                               </div>
                             )}
@@ -548,15 +608,15 @@ export default function GerenciarTickets() {
                           </Badge>
                         </td>
                         <td>
-                          <div className="text-sm">
+                          <div className="text-xs">
                             <div className="font-medium">
                               {ticket.ultimo_login
                                 ? formatarDataSimples(ticket.ultimo_login)
                                 : "Nunca"}
                             </div>
-                            <div className="mt-1">
+                            <div className="mt-0">
                               {ticket.dias_sem_logar ? (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
                                   <span
                                     className={
                                       ticket.dias_sem_logar > 30
@@ -569,7 +629,7 @@ export default function GerenciarTickets() {
                                   {ticket.dias_sem_logar > 30 && (
                                     <Badge
                                       variant="destructive"
-                                      className="text-xs"
+                                      className="text-xs px-1 py-0"
                                     >
                                       Crítico
                                     </Badge>
@@ -582,38 +642,65 @@ export default function GerenciarTickets() {
                           </div>
                         </td>
                         <td>
-                          <div className="text-sm">
+                          <div className="text-xs">
                             {ticket.departamento || "N/A"}
                           </div>
                         </td>
                         <td>
-                          <div className="text-sm">
+                          <div className="text-xs">
                             {ticket.setor_sgu || "N/A"}
                           </div>
                         </td>
                         <td>
-                          <Select
-                            value={ticket.status_ticket}
-                            onValueChange={(value) =>
-                              atualizarStatusTicket(ticket.username, value)
-                            }
-                          >
-                            <SelectTrigger className="w-[180px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="PENDENTE">Pendente</SelectItem>
-                              <SelectItem value="EXCLUIR">Excluir</SelectItem>
-                              <SelectItem value="MANTER">Manter</SelectItem>
-                              <SelectItem value="TRANSFERIR">
-                                Transferir
-                              </SelectItem>
-                              <SelectItem value="BLOQUEAR">Bloquear</SelectItem>
-                              <SelectItem value="DESBLOQUEAR">
-                                Desbloquear
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-0.5">
+                            <Select
+                              value={ticket.status_ticket}
+                              onValueChange={(value) =>
+                                atualizarStatusTicket(ticket.username, value)
+                              }
+                            >
+                              <SelectTrigger className="w-[160px] h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="PENDENTE">
+                                  Pendente
+                                </SelectItem>
+                                <SelectItem value="EXCLUIR">Excluir</SelectItem>
+                                <SelectItem value="MANTER">Manter</SelectItem>
+                                <SelectItem value="TRANSFERIR">
+                                  Transferir
+                                </SelectItem>
+                                <SelectItem value="TRANSFERIDO">
+                                  Transferido
+                                </SelectItem>
+                                <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
+                                  Prestando serviço em outro órgão
+                                </SelectItem>
+                                <SelectItem value="BLOQUEAR">
+                                  Bloquear
+                                </SelectItem>
+                                <SelectItem value="DESBLOQUEAR">
+                                  Desbloquear
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {!ticket.fechado && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fecharTicket(ticket.username)}
+                                className="w-full h-5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                Fechar
+                              </Button>
+                            )}
+                            {ticket.fechado && (
+                              <div className="text-xs text-green-600 font-medium text-center">
+                                ✓ Fechado
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
