@@ -1,0 +1,74 @@
+/* Estilos para tabela com header fixo */
+.sticky-table-container {
+  position: relative;
+  overflow-x: auto;
+  height: 600px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background-color: white;
+}
+
+.sticky-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background-color: white;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+.sticky-header th {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background-color: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sticky-header th:hover {
+  background-color: #f9fafb;
+}
+
+/* Garantir que as células do body tenham o mesmo padding */
+.sticky-table tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: top;
+}
+
+.sticky-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Garantir que o header fique fixo durante o scroll */
+.sticky-table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sticky-table-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.sticky-table-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.sticky-table-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

@@ -7,7 +7,7 @@ Este sistema permite consultar usuários em um diretório LDAP de duas formas:
 ## 🚀 Funcionalidades
 
 ### Consulta Individual
-- Busca por nome de usuário (sAMAccountName)
+- Busca por usuário de rede (sAMAccountName)
 - Busca por e-mail (mail)
 - Busca por nome completo (displayName/cn)
 - Exibe informações detalhadas do usuário encontrado
@@ -90,7 +90,7 @@ O sistema estará disponível em `http://localhost:3000`
 
 1. Acesse a página "Consulta Individual"
 2. Selecione o tipo de busca:
-   - **Nome de Usuário**: Login do usuário (ex: jose.silva)
+   - **Usuário de Rede*: Login do usuário (ex: jose.silva)
    - **E-mail**: Endereço completo (ex: jose.silva@rede.sp)
    - **Nome Completo**: Nome completo (ex: José Silva)
 3. Digite o valor para busca

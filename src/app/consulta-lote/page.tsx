@@ -38,6 +38,7 @@ interface UserResult {
   email?: string;
   displayName?: string;
   department?: string;
+  departmentSgu?: string;
   error?: string;
 }
 
@@ -151,7 +152,7 @@ export default function ConsultaLote() {
   };
 
   const getSearchTypeLabel = (type: string) => {
-    return type === "username" ? "Nome de Usuário" : "E-mail";
+    return type === "username" ? "Usuário de Rede" : "E-mail";
   };
 
   const getStatusBadge = (result: UserResult) => {
@@ -211,7 +212,7 @@ export default function ConsultaLote() {
                       <SelectValue placeholder="Selecione o tipo de busca" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="username">Nome de Usuário</SelectItem>
+                      <SelectItem value="username">Usuário de Rede</SelectItem>
                       <SelectItem value="email">E-mail</SelectItem>
                     </SelectContent>
                   </Select>
@@ -322,7 +323,14 @@ export default function ConsultaLote() {
                             {result.email || "-"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                            {result.department || "-"}
+                            <div>
+                              {result.department || "-"}
+                              {result.departmentSgu && (
+                                <div className="text-xs text-blue-600 mt-1">
+                                  SGU: {result.departmentSgu}
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -347,8 +355,11 @@ export default function ConsultaLote() {
                     Formato do arquivo CSV:
                   </p>
                   <div className="space-y-2">
-                    <p>• O arquivo deve ter uma coluna chamada "username"</p>
-                    <p>• Cada linha deve conter um nome de usuário</p>
+                    <p>
+                      • O arquivo deve ter uma coluna chamada
+                      &rdquo;username&rdquo;
+                    </p>
+                    <p>• Cada linha deve conter um usuário de rede</p>
                     <p>• Exemplo de conteúdo:</p>
                     <div className="bg-slate-100 p-3 rounded text-xs font-mono">
                       username
@@ -368,7 +379,7 @@ export default function ConsultaLote() {
                   </p>
                   <div className="space-y-1">
                     <p>
-                      • <strong>Nome de Usuário:</strong> Busca pelo login do
+                      • <strong>Usuário de Rede:</strong> Busca pelo login do
                       usuário
                     </p>
                     <p>

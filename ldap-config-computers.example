@@ -1,0 +1,24 @@
+# Configurações LDAP para Computadores Inativos
+# Adicione estas variáveis ao seu arquivo .env.local
+
+# Servidor LDAP (IP ou hostname)
+LDAP_SERVER="ldap://seu-servidor-ldap.com"
+
+# Domínio (formato @dominio.com)
+LDAP_DOMAIN="@empresa.com"
+
+# Base DN (formato DC=dominio,DC=com) - usado como OU para computadores
+LDAP_BASE="DC=empresa,DC=com"
+
+# Usuário para autenticação
+LDAP_USER="usuario_admin"
+
+# Senha do usuário
+LDAP_PASS="sua-senha"
+
+# Exemplo de configuração para SMUL (baseado no .env.local atual)
+# LDAP_SERVER="ldap://10.10.65.242"
+# LDAP_DOMAIN="@rede.sp"
+# LDAP_BASE="DC=rede,DC=sp"
+# LDAP_USER="usr_smdu_freenas"
+# LDAP_PASS="Prodam01"

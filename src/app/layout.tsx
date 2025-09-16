@@ -51,6 +51,18 @@ export default function RootLayout({
               >
                 Usuários Inativos
               </a>
+              <a
+                href="/gerenciar-usuarios-inativos"
+                className="transition-colors hover:text-gray-900 text-gray-600"
+              >
+                Gerenciar Inativos
+              </a>
+              <a
+                href="/gerenciar-tickets"
+                className="transition-colors hover:text-gray-900 text-gray-600"
+              >
+                Gerenciar Tickets
+              </a>
             </nav>
           </div>
         </header>

@@ -1,0 +1,161 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "sqlite"
+    url      = "file:./data/usuarios_inativos.db"
+}
+
+model UsuarioInativo {
+    id               Int      @id @default(autoincrement())
+    username         String   @unique
+    nome             String
+    email            String?
+    departamento     String?
+    departamento_sgu String?
+    ultimo_login     String
+    dias_inativos    Int
+    status           Status   @default(PENDENTE)
+    data_criacao     DateTime @default(now())
+    data_atualizacao DateTime @updatedAt
+    servidor_origem  String
+    ou_origem        String
+
+    @@index([username])
+    @@index([status])
+    @@index([dias_inativos])
+    @@map("usuarios_inativos")
+}
+
+model ComputadorInativo {
+    id                  Int      @id @default(autoincrement())
+    nome_computador     String   @unique
+    ip_address          String?
+    mac_address         String?
+    departamento        String?
+    departamento_sgu    String?
+    usuario_responsavel String?
+    ultimo_login        String
+    dias_inativos       Int
+    status              Status   @default(PENDENTE)
+    data_criacao        DateTime @default(now())
+    data_atualizacao    DateTime @updatedAt
+    servidor_origem     String
+    ou_origem           String
+    sistema_operacional String?
+    versao_so           String?
+
+    @@index([nome_computador])
+    @@index([status])
+    @@index([dias_inativos])
+    @@index([ip_address])
+    @@map("computadores_inativos")
+}
+
+model UsuarioExoneradoTransferido {
+    id                Int             @id @default(autoincrement())
+    username          String          @unique
+    nome              String
+    email             String?
+    departamento_ldap String?
+    departamento_sgu  String?
+    cargo             String?
+    vinculo           String?
+    rf                String?
+    existe_ldap       Boolean         @default(false)
+    data_verificacao  DateTime        @default(now())
+    status            StatusExonerado @default(PENDENTE)
+    data_criacao      DateTime        @default(now())
+    data_atualizacao  DateTime        @updatedAt
+    observacoes       String?
+
+    @@index([username])
+    @@index([status])
+    @@index([existe_ldap])
+    @@map("usuarios_exonerados_transferidos")
+}
+
+enum Status {
+    EXONERADO
+    TRANSFERIDO
+    LIP
+    AFASTADO_PARA_OUTRO_ORGAO
+    LICENCA_MEDICA
+    PENDENTE
+    USUARIO_CORINGA
+
+    @@map("Status")
+}
+
+enum StatusExonerado {
+    EXONERADO
+    TRANSFERIDO
+    LIP
+    AFASTADO_PARA_OUTRO_ORGAO
+    LICENCA_MEDICA
+    PENDENTE
+    USUARIO_CORINGA
+    ATIVO_LDAP
+    INATIVO_LDAP
+
+    @@map("StatusExonerado")
+}
+
+// Novo modelo para sistema de tickets
+model Ticket {
+    id               Int          @id @default(autoincrement())
+    username         String       @unique
+    nome             String
+    email            String?
+    departamento     String?
+    empresa          String?
+    status_ldap      StatusLDAP   @default(NAO_ENCONTRADO)
+    ultimo_login     String?
+    dias_sem_logar   Int?
+    status_sgu       StatusSGU    @default(NAO_ENCONTRADO)
+    setor_sgu        String?
+    status_ticket    StatusTicket @default(PENDENTE)
+    observacoes      String?
+    data_criacao     DateTime     @default(now())
+    data_atualizacao DateTime     @updatedAt
+    servidor_origem  String?
+    ou_origem        String?
+
+    @@index([username])
+    @@index([status_ldap])
+    @@index([status_sgu])
+    @@index([status_ticket])
+    @@index([dias_sem_logar])
+    @@map("tickets")
+}
+
+enum StatusLDAP {
+    ATIVO
+    BLOQUEADO
+    DESATIVO
+    NAO_ENCONTRADO
+
+    @@map("StatusLDAP")
+}
+
+enum StatusSGU {
+    ENCONTRADO
+    NAO_ENCONTRADO
+
+    @@map("StatusSGU")
+}
+
+enum StatusTicket {
+    PENDENTE
+    EXCLUIR
+    MANTER
+    TRANSFERIR
+    BLOQUEAR
+    DESBLOQUEAR
+
+    @@map("StatusTicket")
+}

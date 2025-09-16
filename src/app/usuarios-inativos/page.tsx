@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatarDataBrasileira } from "@/lib/date-utils";
 import {
   Card,
   CardContent,
@@ -31,6 +32,7 @@ interface InactiveUser {
   displayName: string;
   email?: string;
   department?: string;
+  departmentSgu?: string;
   lastLogon?: string;
   daysInactive: number;
   ou: string;
@@ -45,6 +47,7 @@ interface InactiveUsersResponse {
     inactiveUsers: number;
     activeUsers: number;
   };
+  error?: string;
 }
 
 export default function UsuariosInativosPage() {
@@ -129,6 +132,7 @@ export default function UsuariosInativosPage() {
         displayName: user.displayName,
         email: user.email || "",
         department: user.department || "",
+        departmentSgu: user.departmentSgu || "",
         lastLogon: user.lastLogon || "Nunca",
         daysInactive: user.daysInactive,
         ou: user.ou,
@@ -150,17 +154,6 @@ export default function UsuariosInativosPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const formatLastLogon = (lastLogon?: string) => {
-    if (!lastLogon) return "Nunca";
-
-    try {
-      const date = new Date(lastLogon);
-      return date.toLocaleString("pt-BR");
-    } catch {
-      return lastLogon;
-    }
   };
 
   const getInactiveBadgeVariant = (days: number) => {
@@ -324,6 +317,11 @@ export default function UsuariosInativosPage() {
                         <div className="text-sm text-gray-500">
                           {user.username} •{" "}
                           {user.department || "Sem departamento"}
+                          {user.departmentSgu && (
+                            <span className="ml-2 text-blue-600">
+                              (SGU: {user.departmentSgu})
+                            </span>
+                          )}
                         </div>
                         {user.email && (
                           <div className="text-sm text-gray-500">
@@ -337,7 +335,9 @@ export default function UsuariosInativosPage() {
                     <div className="text-right">
                       <div className="text-sm text-gray-500">Último Login</div>
                       <div className="font-medium">
-                        {formatLastLogon(user.lastLogon)}
+                        {user.lastLogon
+                          ? formatarDataBrasileira(user.lastLogon)
+                          : "Nunca"}
                       </div>
                     </div>
                     <div className="text-right">

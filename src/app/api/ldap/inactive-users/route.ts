@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as ldap from "ldapjs";
+import { buscarDepartamentosSgu, initSguDatabase } from "@/lib/sgu-database";
 
 // Lista de servidores LDAP
 const LDAP_SERVERS = [
@@ -26,6 +27,7 @@ interface InactiveUser {
   displayName: string;
   email?: string;
   department?: string;
+  departmentSgu?: string;
   lastLogon?: string;
   daysInactive: number;
   ou: string;
@@ -109,7 +111,12 @@ async function searchUsersInOU(
       connectTimeout: 10000,
     });
 
-    const bindDN = `${process.env.LDAP_USER}${process.env.LDAP_DOMAIN}`;
+    // Para Active Directory, usar o formato usuario@dominio.com
+    const bindDN = process.env.LDAP_USER?.includes("\\")
+      ? process.env.LDAP_USER
+      : process.env.LDAP_USER?.includes("@")
+      ? process.env.LDAP_USER
+      : `${process.env.LDAP_USER}@${process.env.LDAP_DOMAIN?.replace("@", "")}`;
     const escapedOU = escapeFilterValue(ou);
 
     client.bind(bindDN, process.env.LDAP_PASS || "", (err) => {
@@ -156,10 +163,18 @@ async function searchUsersInOU(
 
         res.on("searchEntry", (entry) => {
           // Extrair dados diretamente do objeto entry (como no PHP)
-          const username = entry.object.sAMAccountName || "";
-          const displayName = entry.object.displayName || "";
-          const email = entry.object.mail || "";
-          const department = entry.object.department || "";
+          const username = Array.isArray(entry.object.sAMAccountName)
+            ? entry.object.sAMAccountName[0]
+            : entry.object.sAMAccountName || "";
+          const displayName = Array.isArray(entry.object.displayName)
+            ? entry.object.displayName[0]
+            : entry.object.displayName || "";
+          const email = Array.isArray(entry.object.mail)
+            ? entry.object.mail[0]
+            : entry.object.mail || "";
+          const department = Array.isArray(entry.object.department)
+            ? entry.object.department[0]
+            : entry.object.department || "";
 
           // Tenta diferentes atributos de último login
           let lastLogon: string | undefined;
@@ -167,10 +182,16 @@ async function searchUsersInOU(
           const lastLogonAttr = entry.object.lastLogon;
 
           if (lastLogonTimestamp) {
-            const date = convertADTimestamp(lastLogonTimestamp);
+            const date = convertADTimestamp(
+              Array.isArray(lastLogonTimestamp)
+                ? lastLogonTimestamp[0]
+                : lastLogonTimestamp
+            );
             lastLogon = date ? date.toISOString() : undefined;
           } else if (lastLogonAttr) {
-            const date = convertADTimestamp(lastLogonAttr);
+            const date = convertADTimestamp(
+              Array.isArray(lastLogonAttr) ? lastLogonAttr[0] : lastLogonAttr
+            );
             lastLogon = date ? date.toISOString() : undefined;
           }
 
@@ -234,7 +255,15 @@ async function findLatestLoginForUser(
         connectTimeout: 10000,
       });
 
-      const bindDN = `${process.env.LDAP_USER}${process.env.LDAP_DOMAIN}`;
+      // Para Active Directory, usar o formato usuario@dominio.com
+      const bindDN = process.env.LDAP_USER?.includes("\\")
+        ? process.env.LDAP_USER
+        : process.env.LDAP_USER?.includes("@")
+        ? process.env.LDAP_USER
+        : `${process.env.LDAP_USER}@${process.env.LDAP_DOMAIN?.replace(
+            "@",
+            ""
+          )}`;
       const baseDN = process.env.LDAP_BASE || "DC=rede,DC=sp";
       const escapedUsername = escapeFilterValue(username);
 
@@ -260,11 +289,11 @@ async function findLatestLoginForUser(
 
           res.on("searchEntry", (entry) => {
             const lastLogonTimestamp = entry.attributes.find(
-              (attr) => attr.type === "lastLogonTimestamp"
-            )?.values?.[0];
+              (attr) => (attr as any).type === "lastLogonTimestamp"
+            )?.vals?.[0];
             const lastLogonAttr = entry.attributes.find(
-              (attr) => attr.type === "lastLogon"
-            )?.values?.[0];
+              (attr) => (attr as any).type === "lastLogon"
+            )?.vals?.[0];
 
             let lastLogon: string | undefined;
             if (lastLogonTimestamp) {
@@ -433,6 +462,27 @@ export async function POST(request: NextRequest) {
     // Ordena por dias inativos (mais inativos primeiro)
     inactiveUsers.sort((a, b) => b.daysInactive - a.daysInactive);
 
+    // Buscar departamentos do SGU para todos os usuários
+    try {
+      await initSguDatabase();
+      const usernames = inactiveUsers.map((user) => user.username);
+      const departamentosSgu = await buscarDepartamentosSgu(usernames);
+
+      // Adicionar departamento SGU aos usuários
+      inactiveUsers.forEach((user) => {
+        user.departmentSgu = departamentosSgu[user.username] || undefined;
+      });
+
+      console.log(
+        `Departamentos SGU carregados para ${
+          Object.keys(departamentosSgu).length
+        } usuários`
+      );
+    } catch (error) {
+      console.error("Erro ao buscar departamentos SGU:", error);
+      // Continua sem os departamentos SGU
+    }
+
     const summary = {
       totalUsers: finalUsers.length,
       inactiveUsers: inactiveUsers.length,
@@ -442,6 +492,32 @@ export async function POST(request: NextRequest) {
     console.log(
       `Encontrados ${finalUsers.length} usuários, ${inactiveUsers.length} inativos há mais de ${inactiveDays} dias`
     );
+
+    // Salvar usuários inativos na tabela de controle
+    if (inactiveUsers.length > 0) {
+      try {
+        const response = await fetch(
+          `${
+            process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+          }/api/usuarios-inativos`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ usuarios: inactiveUsers }),
+          }
+        );
+
+        if (response.ok) {
+          console.log(
+            `${inactiveUsers.length} usuários inativos salvos na tabela de controle`
+          );
+        } else {
+          console.error("Erro ao salvar usuários na tabela de controle");
+        }
+      } catch (error) {
+        console.error("Erro ao salvar usuários na tabela:", error);
+      }
+    }
 
     return NextResponse.json({
       users: inactiveUsers,

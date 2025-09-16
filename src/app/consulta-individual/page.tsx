@@ -36,6 +36,8 @@ interface UserResult {
   email?: string;
   displayName?: string;
   department?: string;
+  departmentSgu?: string;
+  sguError?: string;
   error?: string;
 }
 
@@ -68,7 +70,7 @@ export default function ConsultaIndividual() {
 
       const data = await response.json();
       setResult(data);
-    } catch (error) {
+    } catch {
       setResult({
         exists: false,
         error: "Erro ao conectar com o servidor LDAP",
@@ -81,7 +83,7 @@ export default function ConsultaIndividual() {
   const getSearchTypeLabel = (type: string) => {
     switch (type) {
       case "username":
-        return "Nome de Usuário";
+        return " Usuário de Rede";
       case "email":
         return "E-mail";
       case "displayName":
@@ -135,13 +137,15 @@ export default function ConsultaIndividual() {
                   </label>
                   <Select
                     value={searchType}
-                    onValueChange={(value: any) => setSearchType(value)}
+                    onValueChange={(
+                      value: "username" | "email" | "displayName"
+                    ) => setSearchType(value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o tipo de busca" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="username">Nome de Usuário</SelectItem>
+                      <SelectItem value="username">Usuário de Rede</SelectItem>
                       <SelectItem value="email">E-mail</SelectItem>
                       <SelectItem value="displayName">Nome Completo</SelectItem>
                     </SelectContent>
@@ -259,11 +263,45 @@ export default function ConsultaIndividual() {
                         <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
                           <Building className="w-4 h-4 text-slate-500" />
                           <span className="text-sm font-medium text-slate-700">
-                            Departamento:
+                            Departamento (LDAP):
                           </span>
                           <span className="text-sm text-slate-600">
                             {result.department}
                           </span>
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-3 p-3 rounded-lg border">
+                        <Building className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          Departamento (SGU):
+                        </span>
+                        {result.departmentSgu ? (
+                          <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 -m-3">
+                            <span className="text-sm text-blue-700 font-medium">
+                              {result.departmentSgu}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-red-600 font-medium">
+                            Não encontrado
+                          </span>
+                        )}
+                      </div>
+                      {result.sguError && (
+                        <div className="flex items-start space-x-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5" />
+                          <div>
+                            <span className="text-sm font-medium text-amber-800">
+                              Departamento (SGU):
+                            </span>
+                            <span className="text-sm text-amber-700 ml-2">
+                              Sistema SGU indisponível
+                            </span>
+                            <p className="text-xs text-amber-600 mt-1">
+                              Não foi possível conectar ao banco SGU para buscar
+                              o departamento
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -300,7 +338,7 @@ export default function ConsultaIndividual() {
                   </Badge>
                   <div>
                     <p className="font-medium text-slate-700">
-                      Nome de Usuário
+                      Usuário de Rede
                     </p>
                     <p>Digite o login do usuário (ex: jose.silva)</p>
                   </div>

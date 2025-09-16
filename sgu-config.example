@@ -1,0 +1,37 @@
+# Configurações do Banco SGU - MySQL
+# Copie este arquivo para .env e ajuste as configurações
+
+# Servidor SGU (IP ou hostname)
+SGU_DB_HOST="10.75.32.125"
+
+# Porta do banco (MySQL padrão é 3306)
+SGU_DB_PORT="3306"
+
+# Nome do banco de dados
+SGU_DB_NAME="SGU"
+
+# Usuário do banco
+SGU_DB_USR="root"
+
+# Senha do banco
+SGU_DB_PASS="Hta123P"
+
+# Exemplos para outros ambientes:
+
+# SQL Server local
+# SGU_DB_HOST="localhost"
+# SGU_DB_NAME="SGU"
+# SGU_DB_USR="sa"
+# SGU_DB_PASS="sua_senha"
+
+# SQL Server com instância nomeada
+# SGU_DB_HOST="servidor\\instancia"
+# SGU_DB_NAME="SGU"
+# SGU_DB_USR="usuario"
+# SGU_DB_PASS="senha"
+
+# Azure SQL Database
+# SGU_DB_HOST="servidor.database.windows.net"
+# SGU_DB_NAME="SGU"
+# SGU_DB_USR="usuario@servidor"
+# SGU_DB_PASS="senha"

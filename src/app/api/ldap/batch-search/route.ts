@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import ldap from "ldapjs";
+import { buscarDepartamentosSgu, initSguDatabase } from "@/lib/sgu-database";
 
 // Configurações do LDAP - ajustadas para o ambiente específico
 const LDAP_CONFIG = {
@@ -24,6 +25,7 @@ interface UserResult {
   email?: string;
   displayName?: string;
   department?: string;
+  departmentSgu?: string;
   error?: string;
 }
 
@@ -69,10 +71,12 @@ async function searchSingleUser(
       reject(err);
     });
 
-    // Para Active Directory, usar o formato DOMINIO\usuario
+    // Para Active Directory, usar o formato usuario@dominio.com
     const bindDN = LDAP_CONFIG.bindDN.includes("\\")
       ? LDAP_CONFIG.bindDN
-      : `${LDAP_CONFIG.bindDN}${LDAP_CONFIG.domain}`;
+      : LDAP_CONFIG.bindDN.includes("@")
+      ? LDAP_CONFIG.bindDN
+      : `${LDAP_CONFIG.bindDN}@${LDAP_CONFIG.domain.replace("@", "")}`;
 
     client.bind(bindDN, LDAP_CONFIG.bindPassword, (err) => {
       if (err) {
@@ -133,6 +137,7 @@ async function searchSingleUser(
               email: userData.mail,
               displayName: userData.displayName || userData.cn,
               department: userData.department || userData.ou,
+              // departmentSgu será adicionado posteriormente no processamento em lote
             });
           } else {
             resolve({
@@ -176,6 +181,34 @@ async function searchUsersInBatch(
     if (batches.indexOf(batch) < batches.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
+  }
+
+  // Buscar departamentos SGU para todos os usuários encontrados
+  try {
+    await initSguDatabase();
+    const foundUsernames = results
+      .filter((r) => r.exists && r.username)
+      .map((r) => r.username!);
+
+    if (foundUsernames.length > 0) {
+      const departamentosSgu = await buscarDepartamentosSgu(foundUsernames);
+
+      // Adicionar departamento SGU aos resultados
+      results.forEach((result) => {
+        if (result.exists && result.username) {
+          result.departmentSgu = departamentosSgu[result.username] || undefined;
+        }
+      });
+
+      console.log(
+        `Departamentos SGU carregados para ${
+          Object.keys(departamentosSgu).length
+        } usuários`
+      );
+    }
+  } catch (error) {
+    console.error("Erro ao buscar departamentos SGU:", error);
+    // Continua sem os departamentos SGU
   }
 
   return results;

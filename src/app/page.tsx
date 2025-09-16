@@ -13,6 +13,9 @@ import {
   ArrowRight,
   Shield,
   Clock,
+  Monitor,
+  UserX,
+  Ticket,
 } from "lucide-react";
 
 export default function Home() {
@@ -34,7 +37,7 @@ export default function Home() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-8 max-w-7xl mx-auto mb-16">
           {/* Consulta Individual */}
           <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
             <CardHeader className="text-center pb-4">
@@ -124,6 +127,109 @@ export default function Home() {
                   className="inline-flex items-center gap-2"
                 >
                   Ver Usuários Inativos
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Computadores Inativos */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                <Monitor className="w-8 h-8 text-purple-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">
+                Computadores Inativos
+              </CardTitle>
+              <CardDescription className="text-gray-600 text-base">
+                Gerencie computadores que não fazem login há muito tempo e
+                mantenha o inventário atualizado
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center space-y-2">
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600 transition-colors w-full"
+              >
+                <Link
+                  href="/computadores-inativos"
+                  className="inline-flex items-center gap-2"
+                >
+                  Ver Computadores Inativos
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="secondary" className="w-full">
+                <Link
+                  href="/buscar-computadores-inativos"
+                  className="inline-flex items-center gap-2"
+                >
+                  Buscar no LDAP
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Servidores Ativos */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                <Users className="w-8 h-8 text-green-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">
+                Servidores Ativos
+              </CardTitle>
+              <CardDescription className="text-gray-600 text-base">
+                Gerencie servidores sem "x" no campo cpUltimaCarga do SGU e
+                verifique se existem no LDAP
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button
+                asChild
+                size="lg"
+                className="group-hover:bg-green-600 transition-colors w-full"
+              >
+                <Link
+                  href="/servidores-ativos"
+                  className="inline-flex items-center gap-2"
+                >
+                  Gerenciar Servidores
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Sistema de Tickets */}
+          <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                <Ticket className="w-8 h-8 text-indigo-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">
+                Sistema de Tickets
+              </CardTitle>
+              <CardDescription className="text-gray-600 text-base">
+                Novo sistema de tickets para pesquisas com status LDAP, SGU e
+                gerenciamento de ações
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button
+                asChild
+                size="lg"
+                className="group-hover:bg-indigo-600 transition-colors w-full"
+              >
+                <Link
+                  href="/gerenciar-tickets"
+                  className="inline-flex items-center gap-2"
+                >
+                  Gerenciar Tickets
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>

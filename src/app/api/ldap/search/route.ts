@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import ldap from "ldapjs";
+import { buscarDepartamentoSgu, initSguDatabase } from "@/lib/sgu-database";
 
 // Configurações do LDAP - ajustadas para o ambiente específico
 const LDAP_CONFIG = {
   url: process.env.LDAP_SERVER || "ldap://10.10.65.242",
   baseDN: process.env.LDAP_BASE || "DC=rede,DC=sp",
   bindDN: process.env.LDAP_USER || "usr_smdu_freenas",
-  bindPassword: process.env.LDAP_PASS || "senha",
+  bindPassword: process.env.LDAP_PASS || "Prodam01",
   domain: process.env.LDAP_DOMAIN || "@rede.sp",
   timeout: 5000,
   connectTimeout: 10000,
@@ -69,10 +70,12 @@ async function searchLDAP(filter: string): Promise<UserResult> {
       reject(err);
     });
 
-    // Para Active Directory, usar o formato DOMINIO\usuario
+    // Para Active Directory, usar o formato usuario@dominio.com
     const bindDN = LDAP_CONFIG.bindDN.includes("\\")
       ? LDAP_CONFIG.bindDN
-      : `${LDAP_CONFIG.bindDN}${LDAP_CONFIG.domain}`;
+      : LDAP_CONFIG.bindDN.includes("@")
+      ? LDAP_CONFIG.bindDN
+      : `${LDAP_CONFIG.bindDN}@${LDAP_CONFIG.domain.replace("@", "")}`;
 
     client.bind(bindDN, LDAP_CONFIG.bindPassword, (err) => {
       if (err) {
@@ -122,16 +125,32 @@ async function searchLDAP(filter: string): Promise<UserResult> {
           reject(err);
         });
 
-        res.on("end", () => {
+        res.on("end", async () => {
           client.unbind();
 
           if (found) {
+            const username = userData.sAMAccountName || userData.uid;
+            let departmentSgu: string | undefined;
+
+            // Buscar departamento SGU se o usuário foi encontrado
+            if (username) {
+              try {
+                await initSguDatabase();
+                const sguDept = await buscarDepartamentoSgu(username);
+                departmentSgu = sguDept || undefined;
+              } catch (error) {
+                console.error("Erro ao buscar departamento SGU:", error);
+                // Continua sem o departamento SGU
+              }
+            }
+
             resolve({
               exists: true,
-              username: userData.sAMAccountName || userData.uid,
+              username,
               email: userData.mail,
               displayName: userData.displayName || userData.cn,
               department: userData.department || userData.ou,
+              departmentSgu,
             });
           } else {
             resolve({
