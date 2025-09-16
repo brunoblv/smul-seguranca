@@ -119,19 +119,32 @@ model Ticket {
     status_sgu       StatusSGU    @default(NAO_ENCONTRADO)
     setor_sgu        String?
     status_ticket    StatusTicket @default(PENDENTE)
+    acao             AcaoTicket?
     fechado          Boolean      @default(false)
     observacoes      String?
     data_criacao     DateTime     @default(now())
     data_atualizacao DateTime     @updatedAt
     servidor_origem  String?
     ou_origem        String?
+    criado_por       String? // Username de quem criou
+    fechado_por      String? // Username de quem fechou
+    data_abertura    DateTime? // Data/hora da abertura do ticket
+    data_fechamento  DateTime? // Data/hora do fechamento
+    alterado_por     String? // Username de quem fez a última alteração
+    data_alteracao   DateTime? // Data/hora da última alteração
 
     @@index([username])
     @@index([status_ldap])
     @@index([status_sgu])
     @@index([status_ticket])
+    @@index([acao])
     @@index([fechado])
     @@index([dias_sem_logar])
+    @@index([criado_por])
+    @@index([fechado_por])
+    @@index([data_abertura])
+    @@index([data_fechamento])
+    @@index([alterado_por])
     @@map("tickets")
 }
 
@@ -153,6 +166,12 @@ enum StatusSGU {
 
 enum StatusTicket {
     PENDENTE
+    FECHADO
+
+    @@map("StatusTicket")
+}
+
+enum AcaoTicket {
     EXCLUIR
     MANTER
     TRANSFERIR
@@ -161,5 +180,43 @@ enum StatusTicket {
     BLOQUEAR
     DESBLOQUEAR
 
-    @@map("StatusTicket")
+    @@map("AcaoTicket")
+}
+
+model Usuario {
+    id               Int                @id @default(autoincrement())
+    username         String             @unique
+    nome             String
+    email            String?            @unique
+    ativo            Boolean            @default(true)
+    admin            Boolean            @default(false)
+    data_criacao     DateTime           @default(now())
+    data_atualizacao DateTime           @updatedAt
+    ultimo_login     DateTime?
+    permissoes       UsuarioPermissao[]
+
+    @@map("usuarios")
+}
+
+enum Permissao {
+    VISUALIZAR_TICKETS
+    CRIAR_TICKETS
+    EDITAR_TICKETS
+    FECHAR_TICKETS
+    VISUALIZAR_USUARIOS
+    CRIAR_USUARIOS
+    EDITAR_USUARIOS
+    ADMINISTRAR_SISTEMA
+
+    @@map("Permissao")
+}
+
+model UsuarioPermissao {
+    id         Int       @id @default(autoincrement())
+    usuario_id Int
+    permissao  Permissao
+    usuario    Usuario   @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+    @@unique([usuario_id, permissao])
+    @@map("usuario_permissoes")
 }

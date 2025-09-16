@@ -6,7 +6,8 @@ import {
   deletarTicket,
   obterEstatisticasTickets,
 } from "@/lib/ticket-database";
-import { StatusTicket } from "@prisma/client";
+import { StatusTicket, AcaoTicket } from "@prisma/client";
+import { obterUsuarioSessao } from "@/lib/auth-session";
 
 // GET - Listar tickets com filtros
 export async function GET(request: NextRequest) {
@@ -19,6 +20,8 @@ export async function GET(request: NextRequest) {
     const dias_sem_logar_min = searchParams.get("dias_sem_logar_min");
     const fechado = searchParams.get("fechado");
     const username = searchParams.get("username");
+    const page = searchParams.get("page");
+    const limit = searchParams.get("limit");
 
     // Se foi especificado um username, buscar ticket específico
     if (username) {
@@ -47,13 +50,20 @@ export async function GET(request: NextRequest) {
       filtros.dias_sem_logar_min = parseInt(dias_sem_logar_min);
     if (fechado !== null && fechado !== "")
       filtros.fechado = fechado === "true";
+    if (page) filtros.page = parseInt(page);
+    if (limit) filtros.limit = parseInt(limit);
 
-    const tickets = await listarTickets(filtros);
+    const resultado = await listarTickets(filtros);
 
     return NextResponse.json({
       success: true,
-      data: tickets,
-      count: tickets.length,
+      data: resultado.tickets,
+      pagination: {
+        total: resultado.total,
+        totalPages: resultado.totalPages,
+        currentPage: resultado.currentPage,
+        limit: filtros.limit || 20,
+      },
     });
   } catch (error) {
     console.error("Erro ao listar tickets:", error);
@@ -71,7 +81,7 @@ export async function GET(request: NextRequest) {
 // PUT - Atualizar status do ticket ou fechar
 export async function PUT(request: NextRequest) {
   try {
-    const { username, status_ticket, observacoes, fechado } =
+    const { username, status_ticket, acao, observacoes, fechado } =
       await request.json();
 
     if (!username) {
@@ -84,13 +94,19 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Obter usuário da sessão para auditoria
+    const usuario = await obterUsuarioSessao(request);
+    const alterado_por = usuario?.nome || usuario?.username || "SISTEMA";
+
     // Se está fechando o ticket
     if (fechado !== undefined) {
       const ticket = await atualizarStatusTicket(
         username,
         status_ticket || "PENDENTE",
         observacoes,
-        fechado
+        fechado,
+        alterado_por,
+        acao
       );
 
       return NextResponse.json({
@@ -124,7 +140,10 @@ export async function PUT(request: NextRequest) {
     const ticket = await atualizarStatusTicket(
       username,
       status_ticket,
-      observacoes
+      observacoes,
+      undefined,
+      alterado_por,
+      acao
     );
 
     return NextResponse.json({

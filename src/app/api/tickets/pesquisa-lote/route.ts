@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { buscarUsuariosLDAP } from "@/lib/ldap-ticket";
 import { buscarUsuariosSGU } from "@/lib/sgu-ticket";
 import { criarOuAtualizarTicket, TicketData } from "@/lib/ticket-database";
-import { StatusLDAP, StatusSGU, StatusTicket } from "@prisma/client";
+import {
+  StatusLDAP,
+  StatusSGU,
+  StatusTicket,
+  AcaoTicket,
+} from "@prisma/client";
+import { obterUsuarioSessao } from "@/lib/auth-session";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +28,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Obter usuário da sessão para auditoria
+    const usuario = await obterUsuarioSessao(request);
+    const criado_por = usuario?.nome || usuario?.username || "SISTEMA";
+
     console.log(`=== PESQUISA EM LOTE: ${usernames.length} usuários ===`);
+    console.log(`Usuário logado: ${criado_por}`);
 
     // 1. Buscar informações no LDAP para todos os usuários
     console.log("1. Buscando informações LDAP...");
@@ -57,6 +68,10 @@ export async function POST(request: NextRequest) {
           status_ticket: StatusTicket.PENDENTE,
           servidor_origem: ldapInfo.servidor_origem,
           ou_origem: ldapInfo.ou_origem,
+          criado_por: criado_por, // Usar o usuário logado
+          alterado_por: criado_por,
+          data_abertura: new Date(), // Data/hora da abertura do ticket
+          data_alteracao: new Date(),
         };
 
         // Criar ou atualizar ticket

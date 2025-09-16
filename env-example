@@ -50,3 +50,9 @@ NEXT_PUBLIC_BASE_URL="http://localhost:3000"
 # URL de conexão com o banco MySQL
 # Formato: mysql://usuario:senha@host:porta/nome_do_banco
 DATABASE_URL="mysql://root:senha@localhost:3306/seguranca_smul"
+
+# ===========================================
+# CONFIGURAÇÕES DE AUTENTICAÇÃO
+# ===========================================
+# Chave secreta para JWT (altere em produção)
+JWT_SECRET="seguranca-smul-jwt-secret-key-2024-production"

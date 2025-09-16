@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import "./table-styles.css";
 import { formatarDataBrasileira, formatarDataSimples } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
@@ -36,12 +36,19 @@ interface Ticket {
   status_sgu: string;
   setor_sgu?: string;
   status_ticket: string;
+  acao?: string;
   fechado: boolean;
   observacoes?: string;
   data_criacao: string;
   data_atualizacao: string;
   servidor_origem?: string;
   ou_origem?: string;
+  criado_por?: string;
+  fechado_por?: string;
+  data_abertura?: string;
+  data_fechamento?: string;
+  alterado_por?: string;
+  data_alteracao?: string;
 }
 
 interface Estatisticas {
@@ -70,12 +77,27 @@ export default function GerenciarTickets() {
   });
   const [pesquisaIndividual, setPesquisaIndividual] = useState("");
   const [pesquisaLote, setPesquisaLote] = useState("");
-  // Removido limite de itens - mostrar todos os tickets
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
-  const [hasScrolled, setHasScrolled] = useState(false);
+  const [paginacao, setPaginacao] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    total: 0,
+    limit: 20,
+  });
+  const [linhasExpandidas, setLinhasExpandidas] = useState<Set<number>>(
+    new Set()
+  );
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+    show: boolean;
+  }>({
+    type: "success",
+    message: "",
+    show: false,
+  });
 
   // Carregar tickets e estatísticas
-  const carregarDados = async () => {
+  const carregarDados = async (page = 1) => {
     try {
       setLoading(true);
 
@@ -89,6 +111,8 @@ export default function GerenciarTickets() {
       if (filtros.dias_sem_logar_min)
         params.append("dias_sem_logar_min", filtros.dias_sem_logar_min);
       if (filtros.fechado) params.append("fechado", filtros.fechado);
+      params.append("page", page.toString());
+      params.append("limit", "20");
 
       const [ticketsRes, estatisticasRes] = await Promise.all([
         fetch(`/api/tickets?${params.toString()}`),
@@ -100,6 +124,9 @@ export default function GerenciarTickets() {
 
       if (ticketsData.success) {
         setTickets(ticketsData.data);
+        if (ticketsData.pagination) {
+          setPaginacao(ticketsData.pagination);
+        }
       }
 
       if (estatisticasData.success) {
@@ -113,8 +140,50 @@ export default function GerenciarTickets() {
   };
 
   useEffect(() => {
-    carregarDados();
+    carregarDados(1); // Sempre voltar para a primeira página quando filtrar
   }, [filtros]);
+
+  // Funções de navegação de página
+  const irParaPagina = (pagina: number) => {
+    if (pagina >= 1 && pagina <= paginacao.totalPages) {
+      carregarDados(pagina);
+    }
+  };
+
+  const proximaPagina = () => {
+    if (paginacao.currentPage < paginacao.totalPages) {
+      irParaPagina(paginacao.currentPage + 1);
+    }
+  };
+
+  const paginaAnterior = () => {
+    if (paginacao.currentPage > 1) {
+      irParaPagina(paginacao.currentPage - 1);
+    }
+  };
+
+  // Funções para controlar expansão das linhas
+  const toggleLinha = (ticketId: number) => {
+    const novasLinhas = new Set(linhasExpandidas);
+    if (novasLinhas.has(ticketId)) {
+      novasLinhas.delete(ticketId);
+    } else {
+      novasLinhas.add(ticketId);
+    }
+    setLinhasExpandidas(novasLinhas);
+  };
+
+  const isLinhaExpandida = (ticketId: number) => {
+    return linhasExpandidas.has(ticketId);
+  };
+
+  // Função para mostrar feedback
+  const mostrarFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message, show: true });
+    setTimeout(() => {
+      setFeedback((prev) => ({ ...prev, show: false }));
+    }, 3000);
+  };
 
   // Pesquisa individual
   const handlePesquisaIndividual = async () => {
@@ -132,7 +201,7 @@ export default function GerenciarTickets() {
       if (data.success) {
         alert("Pesquisa realizada com sucesso!");
         setPesquisaIndividual("");
-        carregarDados();
+        carregarDados(1);
       } else {
         alert(`Erro: ${data.message}`);
       }
@@ -167,7 +236,7 @@ export default function GerenciarTickets() {
           `Pesquisa em lote concluída: ${data.data.tickets_criados} tickets processados`
         );
         setPesquisaLote("");
-        carregarDados();
+        carregarDados(1);
       } else {
         alert(`Erro: ${data.message}`);
       }
@@ -196,7 +265,7 @@ export default function GerenciarTickets() {
 
       if (data.success) {
         alert("Status atualizado com sucesso!");
-        carregarDados();
+        carregarDados(paginacao.currentPage);
       } else {
         alert(`Erro: ${data.message}`);
       }
@@ -206,8 +275,56 @@ export default function GerenciarTickets() {
     }
   };
 
+  // Atualizar ação do ticket
+  const atualizarAcaoTicket = async (username: string, acao: string) => {
+    try {
+      const response = await fetch("/api/tickets", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          acao,
+          status_ticket: "PENDENTE", // Manter status como PENDENTE ao atualizar ação
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Atualizar o ticket localmente sem recarregar a página
+        setTickets((prevTickets) =>
+          prevTickets.map((ticket) =>
+            ticket.username === username ? { ...ticket, acao: acao } : ticket
+          )
+        );
+        mostrarFeedback("success", "Ação atualizada com sucesso!");
+      } else {
+        mostrarFeedback("error", `Erro: ${data.message}`);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar ação:", error);
+      mostrarFeedback("error", "Erro ao atualizar ação");
+    }
+  };
+
   // Fechar ticket
   const fecharTicket = async (username: string) => {
+    // Encontrar o ticket para verificar se tem ação definida
+    const ticket = tickets.find((t) => t.username === username);
+
+    if (!ticket) {
+      mostrarFeedback("error", "Ticket não encontrado!");
+      return;
+    }
+
+    if (!ticket.acao) {
+      mostrarFeedback(
+        "error",
+        "É necessário definir uma ação antes de fechar o ticket!"
+      );
+      return;
+    }
+
     if (!confirm("Tem certeza que deseja fechar este ticket?")) {
       return;
     }
@@ -225,19 +342,29 @@ export default function GerenciarTickets() {
       const data = await response.json();
 
       if (data.success) {
-        alert("Ticket fechado com sucesso!");
-        carregarDados();
+        // Atualizar o ticket localmente sem recarregar a página
+        setTickets((prevTickets) =>
+          prevTickets.map((t) =>
+            t.username === username
+              ? { ...t, fechado: true, status_ticket: "FECHADO" }
+              : t
+          )
+        );
+        mostrarFeedback("success", "Ticket fechado com sucesso!");
       } else {
-        alert(`Erro: ${data.message}`);
+        mostrarFeedback("error", `Erro: ${data.message}`);
       }
     } catch (error) {
       console.error("Erro ao fechar ticket:", error);
-      alert("Erro ao fechar ticket");
+      mostrarFeedback("error", "Erro ao fechar ticket");
     }
   };
 
   // Função para obter cor do badge baseado no status
-  const getStatusColor = (status: string, type: "ldap" | "sgu" | "ticket") => {
+  const getStatusColor = (
+    status: string,
+    type: "ldap" | "sgu" | "ticket" | "acao"
+  ) => {
     const colors = {
       ldap: {
         ATIVO: "border-green-200 bg-green-50 text-green-700",
@@ -251,6 +378,9 @@ export default function GerenciarTickets() {
       },
       ticket: {
         PENDENTE: "border-yellow-200 bg-yellow-50 text-yellow-700",
+        FECHADO: "border-gray-200 bg-gray-50 text-gray-700",
+      },
+      acao: {
         EXCLUIR: "border-red-200 bg-red-50 text-red-700",
         MANTER: "border-green-200 bg-green-50 text-green-700",
         TRANSFERIR: "border-blue-200 bg-blue-50 text-blue-700",
@@ -264,38 +394,6 @@ export default function GerenciarTickets() {
 
     return colors[type][status] || "border-gray-200 bg-gray-50 text-gray-700";
   };
-
-  // Mostrar todos os tickets
-  const currentTickets = tickets;
-
-  // Detectar se há scroll disponível
-  useEffect(() => {
-    const checkScroll = () => {
-      const tableContainer = document.querySelector(".overflow-y-auto");
-      if (tableContainer) {
-        setShowScrollIndicator(
-          tableContainer.scrollHeight > tableContainer.clientHeight
-        );
-      }
-    };
-
-    checkScroll();
-    window.addEventListener("resize", checkScroll);
-    return () => window.removeEventListener("resize", checkScroll);
-  }, [tickets]);
-
-  // Detectar quando o usuário rola
-  useEffect(() => {
-    const handleScroll = () => {
-      setHasScrolled(true);
-    };
-
-    const tableContainer = document.querySelector(".overflow-y-auto");
-    if (tableContainer) {
-      tableContainer.addEventListener("scroll", handleScroll);
-      return () => tableContainer.removeEventListener("scroll", handleScroll);
-    }
-  }, [tickets]);
 
   if (loading) {
     return (
@@ -542,15 +640,14 @@ export default function GerenciarTickets() {
                     <th className="w-[150px]">Status SGU</th>
                     <th className="w-[150px]">Status Ticket</th>
                     <th className="w-[150px]">Último Login / Dias Inativo</th>
-                    <th className="w-[150px]">Empresa</th>
-                    <th className="w-[150px]">Setor SGU</th>
+                    <th className="w-[200px]">Sec. AD / SIGPEC</th>
                     <th className="w-[200px]">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {currentTickets.length === 0 ? (
+                  {tickets.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-8">
+                      <td colSpan={8} className="text-center py-8">
                         <div className="text-gray-500">
                           {tickets.length === 0
                             ? "Nenhum ticket encontrado"
@@ -559,180 +656,471 @@ export default function GerenciarTickets() {
                       </td>
                     </tr>
                   ) : (
-                    currentTickets.map((ticket) => (
-                      <tr key={ticket.id}>
-                        <td className="font-medium">{ticket.id}</td>
-                        <td>
-                          <div>
-                            <div className="font-medium text-sm">
-                              {ticket.nome}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              @{ticket.username}
-                            </div>
-                            {ticket.email && (
-                              <div className="text-xs text-gray-500">
-                                {ticket.email}
+                    tickets.map((ticket) => (
+                      <React.Fragment key={ticket.id}>
+                        {/* Linha principal */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="font-medium">{ticket.id}</td>
+                          <td>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => toggleLinha(ticket.id)}
+                                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                              >
+                                <svg
+                                  className={`w-4 h-4 transition-transform ${
+                                    isLinhaExpandida(ticket.id)
+                                      ? "rotate-90"
+                                      : ""
+                                  }`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 5l7 7-7 7"
+                                  />
+                                </svg>
+                              </button>
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {ticket.nome}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  @{ticket.username}
+                                </div>
+                                {ticket.email && (
+                                  <div className="text-xs text-gray-500">
+                                    {ticket.email}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <Badge
-                            variant="outline"
-                            className={getStatusColor(
-                              ticket.status_ldap,
-                              "ldap"
-                            )}
-                          >
-                            {ticket.status_ldap}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge
-                            variant="outline"
-                            className={getStatusColor(ticket.status_sgu, "sgu")}
-                          >
-                            {ticket.status_sgu}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge
-                            variant="outline"
-                            className={getStatusColor(
-                              ticket.status_ticket,
-                              "ticket"
-                            )}
-                          >
-                            {ticket.status_ticket}
-                          </Badge>
-                        </td>
-                        <td>
-                          <div className="text-xs">
-                            <div className="font-medium">
-                              {ticket.ultimo_login
-                                ? formatarDataSimples(ticket.ultimo_login)
-                                : "Nunca"}
                             </div>
-                            <div className="mt-0">
-                              {ticket.dias_sem_logar ? (
-                                <div className="flex items-center gap-1">
-                                  <span
-                                    className={
-                                      ticket.dias_sem_logar > 30
-                                        ? "text-red-600 font-medium"
-                                        : "text-gray-600"
+                          </td>
+                          <td>
+                            <Badge
+                              variant="outline"
+                              className={getStatusColor(
+                                ticket.status_ldap,
+                                "ldap"
+                              )}
+                            >
+                              {ticket.status_ldap}
+                            </Badge>
+                          </td>
+                          <td>
+                            <Badge
+                              variant="outline"
+                              className={getStatusColor(
+                                ticket.status_sgu,
+                                "sgu"
+                              )}
+                            >
+                              {ticket.status_sgu}
+                            </Badge>
+                          </td>
+                          <td>
+                            <Badge
+                              variant="outline"
+                              className={getStatusColor(
+                                ticket.status_ticket,
+                                "ticket"
+                              )}
+                            >
+                              {ticket.status_ticket}
+                            </Badge>
+                          </td>
+                          <td>
+                            <div className="text-xs">
+                              <div className="font-medium">
+                                {ticket.ultimo_login
+                                  ? formatarDataSimples(ticket.ultimo_login)
+                                  : "Nunca"}
+                              </div>
+                              <div className="mt-0">
+                                {ticket.dias_sem_logar ? (
+                                  <div className="flex items-center gap-1">
+                                    <span
+                                      className={
+                                        ticket.dias_sem_logar > 30
+                                          ? "text-red-600 font-medium"
+                                          : "text-gray-600"
+                                      }
+                                    >
+                                      {ticket.dias_sem_logar} dias
+                                    </span>
+                                    {ticket.dias_sem_logar > 30 && (
+                                      <Badge
+                                        variant="destructive"
+                                        className="text-xs px-1 py-0"
+                                      >
+                                        Crítico
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-500">N/A</span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="text-xs space-y-1">
+                              <div>
+                                <span className="text-gray-600 font-medium">
+                                  Sec. AD:
+                                </span>
+                                <div className="ml-2">
+                                  {ticket.empresa || "N/A"}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-gray-600 font-medium">
+                                  SIGPEC:
+                                </span>
+                                <div className="ml-2">
+                                  {ticket.setor_sgu || "N/A"}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="space-y-1">
+                              {!ticket.fechado && (
+                                <>
+                                  <Select
+                                    value={ticket.acao || ""}
+                                    onValueChange={(value) =>
+                                      atualizarAcaoTicket(
+                                        ticket.username,
+                                        value
+                                      )
                                     }
                                   >
-                                    {ticket.dias_sem_logar} dias
-                                  </span>
-                                  {ticket.dias_sem_logar > 30 && (
-                                    <Badge
-                                      variant="destructive"
-                                      className="text-xs px-1 py-0"
-                                    >
-                                      Crítico
-                                    </Badge>
-                                  )}
+                                    <SelectTrigger className="w-full h-7 text-xs">
+                                      <SelectValue placeholder="Selecionar ação" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="EXCLUIR">
+                                        Excluir
+                                      </SelectItem>
+                                      <SelectItem value="MANTER">
+                                        Manter
+                                      </SelectItem>
+                                      <SelectItem value="TRANSFERIR">
+                                        Transferir
+                                      </SelectItem>
+                                      <SelectItem value="TRANSFERIDO">
+                                        Transferido
+                                      </SelectItem>
+                                      <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
+                                        Prestando serviço em outro órgão
+                                      </SelectItem>
+                                      <SelectItem value="BLOQUEAR">
+                                        Bloquear
+                                      </SelectItem>
+                                      <SelectItem value="DESBLOQUEAR">
+                                        Desbloquear
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      fecharTicket(ticket.username)
+                                    }
+                                    className="w-full h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    disabled={!ticket.acao}
+                                  >
+                                    Fechar
+                                  </Button>
+                                </>
+                              )}
+                              {ticket.fechado && (
+                                <div className="text-xs text-green-600 font-medium text-center">
+                                  ✓ Fechado
                                 </div>
-                              ) : (
-                                <span className="text-gray-500">N/A</span>
                               )}
                             </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="text-xs">
-                            {ticket.departamento || "N/A"}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="text-xs">
-                            {ticket.setor_sgu || "N/A"}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="space-y-0.5">
-                            <Select
-                              value={ticket.status_ticket}
-                              onValueChange={(value) =>
-                                atualizarStatusTicket(ticket.username, value)
-                              }
-                            >
-                              <SelectTrigger className="w-[160px] h-7 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="PENDENTE">
-                                  Pendente
-                                </SelectItem>
-                                <SelectItem value="EXCLUIR">Excluir</SelectItem>
-                                <SelectItem value="MANTER">Manter</SelectItem>
-                                <SelectItem value="TRANSFERIR">
-                                  Transferir
-                                </SelectItem>
-                                <SelectItem value="TRANSFERIDO">
-                                  Transferido
-                                </SelectItem>
-                                <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
-                                  Prestando serviço em outro órgão
-                                </SelectItem>
-                                <SelectItem value="BLOQUEAR">
-                                  Bloquear
-                                </SelectItem>
-                                <SelectItem value="DESBLOQUEAR">
-                                  Desbloquear
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {!ticket.fechado && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fecharTicket(ticket.username)}
-                                className="w-full h-5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                Fechar
-                              </Button>
-                            )}
-                            {ticket.fechado && (
-                              <div className="text-xs text-green-600 font-medium text-center">
-                                ✓ Fechado
+                          </td>
+                        </tr>
+
+                        {/* Linha expandida com informações adicionais */}
+                        {isLinhaExpandida(ticket.id) && (
+                          <tr className="bg-gray-50 border-t">
+                            <td></td>
+                            <td colSpan={7} className="p-4">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <h4 className="font-medium text-gray-700 mb-2">
+                                    Informações de Auditoria
+                                  </h4>
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">
+                                        Criado por:
+                                      </span>
+                                      <span className="font-medium">
+                                        {ticket.criado_por || "N/A"}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">
+                                        Fechado por:
+                                      </span>
+                                      <span className="font-medium">
+                                        {ticket.fechado_por || "N/A"}
+                                      </span>
+                                    </div>
+                                    {ticket.data_abertura && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">
+                                          Data abertura:
+                                        </span>
+                                        <span className="font-medium">
+                                          {formatarDataBrasileira(
+                                            ticket.data_abertura
+                                          )}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {ticket.data_fechamento && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">
+                                          Data fechamento:
+                                        </span>
+                                        <span className="font-medium">
+                                          {formatarDataBrasileira(
+                                            ticket.data_fechamento
+                                          )}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {ticket.alterado_por && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">
+                                          Última alteração por:
+                                        </span>
+                                        <span className="font-medium">
+                                          {ticket.alterado_por}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {ticket.data_alteracao && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">
+                                          Data alteração:
+                                        </span>
+                                        <span className="font-medium">
+                                          {formatarDataBrasileira(
+                                            ticket.data_alteracao
+                                          )}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4 className="font-medium text-gray-700 mb-2">
+                                    Ações
+                                  </h4>
+                                  <div className="space-y-2">
+                                    <div>
+                                      <label className="text-sm text-gray-600 block mb-1">
+                                        Ação Atual:
+                                      </label>
+                                      {ticket.acao ? (
+                                        <Badge
+                                          variant="outline"
+                                          className={getStatusColor(
+                                            ticket.acao,
+                                            "acao"
+                                          )}
+                                        >
+                                          {ticket.acao}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-gray-500 text-sm">
+                                          Nenhuma ação definida
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <label className="text-sm text-gray-600 block mb-1">
+                                        Definir Ação:
+                                      </label>
+                                      <Select
+                                        value={ticket.acao || ""}
+                                        onValueChange={(value) =>
+                                          atualizarAcaoTicket(
+                                            ticket.username,
+                                            value
+                                          )
+                                        }
+                                      >
+                                        <SelectTrigger className="w-full h-8 text-xs">
+                                          <SelectValue placeholder="Selecionar ação" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="EXCLUIR">
+                                            Excluir
+                                          </SelectItem>
+                                          <SelectItem value="MANTER">
+                                            Manter
+                                          </SelectItem>
+                                          <SelectItem value="TRANSFERIR">
+                                            Transferir
+                                          </SelectItem>
+                                          <SelectItem value="TRANSFERIDO">
+                                            Transferido
+                                          </SelectItem>
+                                          <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
+                                            Prestando serviço em outro órgão
+                                          </SelectItem>
+                                          <SelectItem value="BLOQUEAR">
+                                            Bloquear
+                                          </SelectItem>
+                                          <SelectItem value="DESBLOQUEAR">
+                                            Desbloquear
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Indicador de Scroll */}
-            {showScrollIndicator && !hasScrolled && (
-              <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm shadow-lg animate-bounce">
+            {/* Controles de Paginação */}
+            {paginacao.totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 px-4 py-3 bg-gray-50 border-t">
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <span>
+                    Mostrando{" "}
+                    {(paginacao.currentPage - 1) * paginacao.limit + 1} a{" "}
+                    {Math.min(
+                      paginacao.currentPage * paginacao.limit,
+                      paginacao.total
+                    )}{" "}
+                    de {paginacao.total} tickets
+                  </span>
+                </div>
+
                 <div className="flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={paginaAnterior}
+                    disabled={paginacao.currentPage === 1}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                    />
-                  </svg>
-                  Role para ver mais
+                    Anterior
+                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from(
+                      { length: Math.min(5, paginacao.totalPages) },
+                      (_, i) => {
+                        const pageNum = i + 1;
+                        const isCurrentPage = pageNum === paginacao.currentPage;
+
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={isCurrentPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => irParaPagina(pageNum)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      }
+                    )}
+
+                    {paginacao.totalPages > 5 && (
+                      <>
+                        <span className="text-gray-500">...</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => irParaPagina(paginacao.totalPages)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {paginacao.totalPages}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={proximaPagina}
+                    disabled={paginacao.currentPage === paginacao.totalPages}
+                  >
+                    Próxima
+                  </Button>
                 </div>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Feedback Toast */}
+      {feedback.show && (
+        <div
+          className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 ${
+            feedback.type === "success"
+              ? "bg-green-500 text-white"
+              : "bg-red-500 text-white"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 flex items-center justify-center">
+              {feedback.type === "success" ? (
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              )}
+            </div>
+            <span className="text-sm font-medium">{feedback.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

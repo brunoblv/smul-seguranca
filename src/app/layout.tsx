@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { LogoutButton } from "@/components/logout-button";
 
 export const metadata: Metadata = {
   title: "Sistema de Consulta LDAP - Segurança SMUL",
@@ -63,6 +64,13 @@ export default function RootLayout({
               >
                 Gerenciar Tickets
               </a>
+              <a
+                href="/gerenciar-usuarios"
+                className="transition-colors hover:text-gray-900 text-gray-600"
+              >
+                Gerenciar Usuários
+              </a>
+              <LogoutButton />
             </nav>
           </div>
         </header>
