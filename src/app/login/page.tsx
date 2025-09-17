@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -13,22 +14,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+  const { user, refreshAuth } = useAuth();
 
   // Verificar se já está logado
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch("/api/auth/me");
-        if (response.ok) {
-          router.push("/gerenciar-tickets");
-        }
-      } catch (error) {
-        // Não está logado, continuar na página de login
-      }
-    };
-
-    checkAuth();
-  }, [router]);
+    if (user) {
+      router.push("/gerenciar-tickets");
+    }
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +40,8 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Login bem-sucedido, redirecionar
+        // Login bem-sucedido, atualizar estado de autenticação e redirecionar
+        await refreshAuth();
         router.push("/gerenciar-tickets");
       } else {
         setError(data.message || "Erro no login");

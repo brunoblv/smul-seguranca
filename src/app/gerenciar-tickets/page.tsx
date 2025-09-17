@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import * as XLSX from "xlsx";
 
 interface Ticket {
   id: number;
@@ -81,7 +82,7 @@ export default function GerenciarTickets() {
     currentPage: 1,
     totalPages: 1,
     total: 0,
-    limit: 20,
+    limit: 5,
   });
   const [linhasExpandidas, setLinhasExpandidas] = useState<Set<number>>(
     new Set()
@@ -112,7 +113,7 @@ export default function GerenciarTickets() {
         params.append("dias_sem_logar_min", filtros.dias_sem_logar_min);
       if (filtros.fechado) params.append("fechado", filtros.fechado);
       params.append("page", page.toString());
-      params.append("limit", "20");
+      params.append("limit", "5");
 
       const [ticketsRes, estatisticasRes] = await Promise.all([
         fetch(`/api/tickets?${params.toString()}`),
@@ -336,6 +337,7 @@ export default function GerenciarTickets() {
         body: JSON.stringify({
           username,
           fechado: true,
+          status_ticket: "FECHADO",
         }),
       });
 
@@ -360,6 +362,126 @@ export default function GerenciarTickets() {
     }
   };
 
+  // Função para formatar status em português
+  const formatarStatus = (
+    status: string,
+    type: "ldap" | "sgu" | "ticket" | "acao"
+  ) => {
+    const formatacoes = {
+      ldap: {
+        ATIVO: "Ativo",
+        BLOQUEADO: "Bloqueado",
+        DESATIVO: "Desativado",
+        NAO_ENCONTRADO: "Não encontrado",
+      },
+      sgu: {
+        ENCONTRADO: "Encontrado",
+        NAO_ENCONTRADO: "Não encontrado",
+      },
+      ticket: {
+        PENDENTE: "Pendente",
+        FECHADO: "Fechado",
+      },
+      acao: {
+        EXCLUIR: "Excluir",
+        MANTER: "Manter",
+        TRANSFERIR: "Transferir",
+        TRANSFERIDO: "Transferido",
+        SERVICO_OUTRO_ORGAO: "Serviço em outro órgão",
+        BLOQUEAR: "Bloquear",
+        DESBLOQUEAR: "Desbloquear",
+        USUARIO_EXCLUIDO: "Usuário excluído",
+      },
+    };
+
+    const valorFormatado = formatacoes[type][status] || status.toLowerCase();
+    return valorFormatado.charAt(0).toUpperCase() + valorFormatado.slice(1);
+  };
+
+  // Função para exportar tickets para Excel
+  const exportarParaExcel = () => {
+    try {
+      // Preparar dados para exportação
+      const dadosExportacao = tickets.map((ticket) => ({
+        ID: ticket.id,
+        Username: ticket.username,
+        Nome: ticket.nome,
+        Email: ticket.email || "",
+        "Status Ticket": formatarStatus(ticket.status_ticket, "ticket"),
+        "Status Rede": formatarStatus(ticket.status_ldap, "ldap"),
+        "Status SGU": formatarStatus(ticket.status_sgu, "sgu"),
+        "Último Login": ticket.ultimo_login
+          ? formatarDataSimples(ticket.ultimo_login)
+          : "Nunca",
+        "Dias Inativo": ticket.dias_sem_logar || 0,
+        "Sec. AD": ticket.empresa || "N/A",
+        SIGPEC: ticket.setor_sgu || "N/A",
+        Ação: ticket.acao ? formatarStatus(ticket.acao, "acao") : "Nenhuma",
+        Status: ticket.fechado ? "Fechado" : "Aberto",
+        "Criado por": ticket.criado_por || "N/A",
+        "Fechado por": ticket.fechado_por || "N/A",
+        "Data Criação": formatarDataBrasileira(ticket.data_criacao),
+        "Data Fechamento": ticket.data_fechamento
+          ? formatarDataBrasileira(ticket.data_fechamento)
+          : "N/A",
+        Observações: ticket.observacoes || "",
+      }));
+
+      // Criar workbook
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+
+      // Ajustar largura das colunas
+      const colWidths = [
+        { wch: 8 }, // ID
+        { wch: 15 }, // Username
+        { wch: 25 }, // Nome
+        { wch: 30 }, // Email
+        { wch: 15 }, // Status Ticket
+        { wch: 15 }, // Status Rede
+        { wch: 15 }, // Status SGU
+        { wch: 15 }, // Último Login
+        { wch: 12 }, // Dias Inativo
+        { wch: 20 }, // Sec. AD
+        { wch: 20 }, // SIGPEC
+        { wch: 20 }, // Ação
+        { wch: 10 }, // Status
+        { wch: 15 }, // Criado por
+        { wch: 15 }, // Fechado por
+        { wch: 20 }, // Data Criação
+        { wch: 20 }, // Data Fechamento
+        { wch: 30 }, // Observações
+      ];
+      ws["!cols"] = colWidths;
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Tickets");
+
+      // Gerar nome do arquivo com data e hora
+      const agora = new Date();
+      const dataHora = agora
+        .toLocaleString("pt-BR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+        .replace(/[\/\s:]/g, "-");
+
+      const nomeArquivo = `tickets-${dataHora}.xlsx`;
+
+      // Fazer download
+      XLSX.writeFile(wb, nomeArquivo);
+
+      mostrarFeedback("success", "Planilha exportada com sucesso!");
+    } catch (error) {
+      console.error("Erro ao exportar planilha:", error);
+      mostrarFeedback("error", "Erro ao exportar planilha");
+    }
+  };
+
   // Função para obter cor do badge baseado no status
   const getStatusColor = (
     status: string,
@@ -370,11 +492,11 @@ export default function GerenciarTickets() {
         ATIVO: "border-green-200 bg-green-50 text-green-700",
         BLOQUEADO: "border-red-200 bg-red-50 text-red-700",
         DESATIVO: "border-yellow-200 bg-yellow-50 text-yellow-700",
-        NAO_ENCONTRADO: "border-gray-200 bg-gray-50 text-gray-700",
+        NAO_ENCONTRADO: "border-red-200 bg-red-50 text-red-700",
       },
       sgu: {
         ENCONTRADO: "border-green-200 bg-green-50 text-green-700",
-        NAO_ENCONTRADO: "border-gray-200 bg-gray-50 text-gray-700",
+        NAO_ENCONTRADO: "border-red-200 bg-red-50 text-red-700",
       },
       ticket: {
         PENDENTE: "border-yellow-200 bg-yellow-50 text-yellow-700",
@@ -385,10 +507,10 @@ export default function GerenciarTickets() {
         MANTER: "border-green-200 bg-green-50 text-green-700",
         TRANSFERIR: "border-blue-200 bg-blue-50 text-blue-700",
         TRANSFERIDO: "border-cyan-200 bg-cyan-50 text-cyan-700",
-        PRESTANDO_SERVICO_OUTRO_ORGAO:
-          "border-indigo-200 bg-indigo-50 text-indigo-700",
+        SERVICO_OUTRO_ORGAO: "border-indigo-200 bg-indigo-50 text-indigo-700",
         BLOQUEAR: "border-orange-200 bg-orange-50 text-orange-700",
         DESBLOQUEAR: "border-purple-200 bg-purple-50 text-purple-700",
+        USUARIO_EXCLUIDO: "border-gray-200 bg-gray-50 text-gray-700",
       },
     };
 
@@ -442,7 +564,7 @@ export default function GerenciarTickets() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Por Status LDAP</CardTitle>
+              <CardTitle className="text-sm">Por Status Rede</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-1">
@@ -539,11 +661,14 @@ export default function GerenciarTickets() {
                 <SelectItem value="MANTER">Manter</SelectItem>
                 <SelectItem value="TRANSFERIR">Transferir</SelectItem>
                 <SelectItem value="TRANSFERIDO">Transferido</SelectItem>
-                <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
-                  Prestando serviço em outro órgão
+                <SelectItem value="SERVICO_OUTRO_ORGAO">
+                  Serviço em outro órgão
                 </SelectItem>
                 <SelectItem value="BLOQUEAR">Bloquear</SelectItem>
                 <SelectItem value="DESBLOQUEAR">Desbloquear</SelectItem>
+                <SelectItem value="USUARIO_EXCLUIDO">
+                  Usuário excluído
+                </SelectItem>
               </SelectContent>
             </Select>
 
@@ -557,7 +682,7 @@ export default function GerenciarTickets() {
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Status LDAP" />
+                <SelectValue placeholder="Status Rede" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
@@ -623,8 +748,31 @@ export default function GerenciarTickets() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Tickets ({tickets.length})</CardTitle>
-            <div className="text-sm text-gray-500">
-              Mostrando {tickets.length} tickets
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={exportarParaExcel}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Exportar Excel
+              </Button>
+              <div className="text-sm text-gray-500">
+                Mostrando {tickets.length} tickets
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -636,9 +784,9 @@ export default function GerenciarTickets() {
                   <tr>
                     <th className="w-[50px]">ID</th>
                     <th className="w-[200px]">Usuário</th>
-                    <th className="w-[150px]">Status LDAP</th>
-                    <th className="w-[150px]">Status SGU</th>
                     <th className="w-[150px]">Status Ticket</th>
+                    <th className="w-[150px]">Status Rede</th>
+                    <th className="w-[150px]">Status SGU</th>
                     <th className="w-[150px]">Último Login / Dias Inativo</th>
                     <th className="w-[200px]">Sec. AD / SIGPEC</th>
                     <th className="w-[200px]">Ações</th>
@@ -700,6 +848,17 @@ export default function GerenciarTickets() {
                               </div>
                             </div>
                           </td>
+                          <td className="text-center">
+                            <Badge
+                              variant="outline"
+                              className={getStatusColor(
+                                ticket.status_ticket,
+                                "ticket"
+                              )}
+                            >
+                              {formatarStatus(ticket.status_ticket, "ticket")}
+                            </Badge>
+                          </td>
                           <td>
                             <Badge
                               variant="outline"
@@ -708,7 +867,7 @@ export default function GerenciarTickets() {
                                 "ldap"
                               )}
                             >
-                              {ticket.status_ldap}
+                              {formatarStatus(ticket.status_ldap, "ldap")}
                             </Badge>
                           </td>
                           <td>
@@ -719,18 +878,7 @@ export default function GerenciarTickets() {
                                 "sgu"
                               )}
                             >
-                              {ticket.status_sgu}
-                            </Badge>
-                          </td>
-                          <td>
-                            <Badge
-                              variant="outline"
-                              className={getStatusColor(
-                                ticket.status_ticket,
-                                "ticket"
-                              )}
-                            >
-                              {ticket.status_ticket}
+                              {formatarStatus(ticket.status_sgu, "sgu")}
                             </Badge>
                           </td>
                           <td>
@@ -773,7 +921,14 @@ export default function GerenciarTickets() {
                                 <span className="text-gray-600 font-medium">
                                   Sec. AD:
                                 </span>
-                                <div className="ml-2">
+                                <div
+                                  className={`ml-2 ${
+                                    ticket.empresa &&
+                                    ticket.empresa.toUpperCase() !== "SMUL"
+                                      ? "text-red-600 font-bold bg-red-50 px-2 py-1 rounded border border-red-200"
+                                      : ""
+                                  }`}
+                                >
                                   {ticket.empresa || "N/A"}
                                 </div>
                               </div>
@@ -787,7 +942,7 @@ export default function GerenciarTickets() {
                               </div>
                             </div>
                           </td>
-                          <td>
+                          <td className="text-left">
                             <div className="space-y-1">
                               {!ticket.fechado && (
                                 <>
@@ -816,14 +971,17 @@ export default function GerenciarTickets() {
                                       <SelectItem value="TRANSFERIDO">
                                         Transferido
                                       </SelectItem>
-                                      <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
-                                        Prestando serviço em outro órgão
+                                      <SelectItem value="SERVICO_OUTRO_ORGAO">
+                                        Serviço em outro órgão
                                       </SelectItem>
                                       <SelectItem value="BLOQUEAR">
                                         Bloquear
                                       </SelectItem>
                                       <SelectItem value="DESBLOQUEAR">
                                         Desbloquear
+                                      </SelectItem>
+                                      <SelectItem value="USUARIO_EXCLUIDO">
+                                        Usuário excluído
                                       </SelectItem>
                                     </SelectContent>
                                   </Select>
@@ -842,7 +1000,17 @@ export default function GerenciarTickets() {
                               )}
                               {ticket.fechado && (
                                 <div className="text-xs text-green-600 font-medium text-center">
-                                  ✓ Fechado
+                                  <Badge
+                                    variant="outline"
+                                    className={getStatusColor(
+                                      ticket.acao || "FECHADO",
+                                      "acao"
+                                    )}
+                                  >
+                                    {ticket.acao
+                                      ? formatarStatus(ticket.acao, "acao")
+                                      : "fechado"}
+                                  </Badge>
                                 </div>
                               )}
                             </div>
@@ -942,7 +1110,7 @@ export default function GerenciarTickets() {
                                             "acao"
                                           )}
                                         >
-                                          {ticket.acao}
+                                          {formatarStatus(ticket.acao, "acao")}
                                         </Badge>
                                       ) : (
                                         <span className="text-gray-500 text-sm">
@@ -979,14 +1147,17 @@ export default function GerenciarTickets() {
                                           <SelectItem value="TRANSFERIDO">
                                             Transferido
                                           </SelectItem>
-                                          <SelectItem value="PRESTANDO_SERVICO_OUTRO_ORGAO">
-                                            Prestando serviço em outro órgão
+                                          <SelectItem value="SERVICO_OUTRO_ORGAO">
+                                            Serviço em outro órgão
                                           </SelectItem>
                                           <SelectItem value="BLOQUEAR">
                                             Bloquear
                                           </SelectItem>
                                           <SelectItem value="DESBLOQUEAR">
                                             Desbloquear
+                                          </SelectItem>
+                                          <SelectItem value="USUARIO_EXCLUIDO">
+                                            Usuário excluído
                                           </SelectItem>
                                         </SelectContent>
                                       </Select>

@@ -52,7 +52,7 @@ interface InactiveUsersResponse {
 
 export default function UsuariosInativosPage() {
   const [ous, setOus] = useState<OU[]>([]);
-  const [selectedOU, setSelectedOU] = useState<string>("");
+  const [selectedOU, setSelectedOU] = useState<string>("SMUL");
   const [inactiveDays, setInactiveDays] = useState<30 | 45 | 60>(30);
   const [results, setResults] = useState<InactiveUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +73,19 @@ export default function UsuariosInativosPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setOus(data.ous || []);
+        const ousData = data.ous || [];
+        setOus(ousData);
+
+        // Define SMUL como padrão se estiver disponível
+        const smulOU = ousData.find(
+          (ou) => ou.name === "SMUL" || ou.name.includes("SMUL")
+        );
+        if (smulOU) {
+          setSelectedOU(smulOU.dn);
+        } else if (ousData.length > 0) {
+          // Se SMUL não for encontrada, usa a primeira OU disponível
+          setSelectedOU(ousData[0].dn);
+        }
       } else {
         alert(`Erro ao carregar OUs: ${data.error}`);
       }
@@ -86,7 +98,7 @@ export default function UsuariosInativosPage() {
   };
 
   const searchInactiveUsers = async () => {
-    if (!selectedOU) {
+    if (!selectedOU || selectedOU === "") {
       alert("Selecione uma OU para buscar usuários inativos");
       return;
     }
@@ -190,7 +202,7 @@ export default function UsuariosInativosPage() {
                 <SelectTrigger>
                   <SelectValue
                     placeholder={
-                      isLoadingOUs ? "Carregando OUs..." : "Selecione uma OU"
+                      isLoadingOUs ? "Carregando OUs..." : "SMUL (padrão)"
                     }
                   />
                 </SelectTrigger>
@@ -322,6 +334,9 @@ export default function UsuariosInativosPage() {
                               (SGU: {user.departmentSgu})
                             </span>
                           )}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          OU: {user.ou}
                         </div>
                         {user.email && (
                           <div className="text-sm text-gray-500">

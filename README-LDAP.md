@@ -1,8 +1,7 @@
 # Sistema de Consulta LDAP - Segurança SMUL
 
-Este sistema permite consultar usuários em um diretório LDAP de duas formas:
-1. **Consulta Individual**: Pesquisa um usuário específico
-2. **Consulta em Lote**: Processa múltiplos usuários através de upload de arquivo CSV
+Este sistema permite consultar usuários em um diretório LDAP:
+- **Consulta Individual**: Pesquisa um usuário específico
 
 ## 🚀 Funcionalidades
 
@@ -13,12 +12,6 @@ Este sistema permite consultar usuários em um diretório LDAP de duas formas:
 - Exibe informações detalhadas do usuário encontrado
 - Interface intuitiva e responsiva
 
-### Consulta em Lote
-- Upload de arquivo CSV com lista de usuários
-- Processamento em lotes para otimizar performance
-- Download dos resultados em formato CSV
-- Limite de 100 usuários por busca para evitar sobrecarga
-- Processamento paralelo com controle de taxa
 
 ## 📋 Pré-requisitos
 
@@ -97,31 +90,12 @@ O sistema estará disponível em `http://localhost:3000`
 4. Clique em "Pesquisar Usuário"
 5. Visualize o resultado
 
-### Consulta em Lote
-
-1. Acesse a página "Consulta em Lote"
-2. Selecione o tipo de busca (usuário ou e-mail)
-3. Faça upload do arquivo CSV
-4. Clique em "Iniciar Busca em Lote"
-5. Aguarde o processamento
-6. Baixe os resultados em CSV
-
-#### Formato do Arquivo CSV
-O arquivo deve conter uma coluna chamada `username`:
-
-```csv
-username
-jose.silva
-maria.santos
-joao.oliveira
-```
 
 ## 🔧 Personalização
 
 ### Atributos LDAP
-Para personalizar os atributos retornados, edite as APIs em:
+Para personalizar os atributos retornados, edite a API em:
 - `src/app/api/ldap/search/route.ts`
-- `src/app/api/ldap/batch-search/route.ts`
 
 Atualmente configurado para Active Directory com:
 ```typescript
@@ -213,10 +187,8 @@ O sistema registra logs detalhados no console. Para debug, verifique:
 
 ### Otimizações Implementadas
 - Conexões LDAP reutilizáveis
-- Processamento em lotes (máximo 5 usuários simultâneos)
 - Timeouts configuráveis
-- Limite de 100 usuários por busca em lote
-- Pausas entre lotes para não sobrecarregar o servidor
+- Interface responsiva e otimizada
 
 ### Monitoramento
 - Tempo de resposta das consultas

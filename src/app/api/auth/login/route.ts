@@ -3,10 +3,8 @@ import { autenticarLDAP } from "@/lib/auth-ldap";
 import {
   buscarUsuarioPorUsername,
   atualizarUltimoLogin,
-  criarUsuario,
 } from "@/lib/auth-database";
 import { gerarToken } from "@/lib/auth-session";
-import { Permissao } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,40 +41,37 @@ export async function POST(request: NextRequest) {
 
     // 2. Verificar se usuário existe no banco
     console.log("3. Verificando usuário no banco...");
-    let usuario = await buscarUsuarioPorUsername(username);
+    const usuario = await buscarUsuarioPorUsername(username);
 
     if (!usuario) {
-      console.log("4. Usuário não encontrado no banco, criando...");
-      // Criar usuário automaticamente com permissões básicas
-      usuario = await criarUsuario({
-        username: ldapResult.user.username,
-        nome: ldapResult.user.nome,
-        email: ldapResult.user.email,
-        admin: false,
-        permissoes: [
-          Permissao.VISUALIZAR_TICKETS,
-          Permissao.CRIAR_TICKETS,
-          Permissao.EDITAR_TICKETS,
-        ],
-      });
-      console.log("5. Usuário criado com permissões básicas");
-    } else if (!usuario.ativo) {
+      console.log("4. Usuário não encontrado no banco - Acesso negado");
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Acesso proibido. Usuário não cadastrado no sistema. Entre em contato com o administrador.",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!usuario.ativo) {
       console.log("4. Usuário inativo");
       return NextResponse.json(
         {
           success: false,
-          message: "Usuário inativo",
+          message: "Usuário inativo. Entre em contato com o administrador.",
         },
         { status: 403 }
       );
     }
 
     // 3. Atualizar último login
-    console.log("6. Atualizando último login...");
+    console.log("5. Atualizando último login...");
     await atualizarUltimoLogin(username);
 
     // 4. Gerar token JWT
-    console.log("7. Gerando token...");
+    console.log("6. Gerando token...");
     const token = gerarToken({
       id: usuario.id,
       username: usuario.username,
@@ -86,7 +81,7 @@ export async function POST(request: NextRequest) {
       permissoes: usuario.permissoes.map((p) => p.permissao),
     });
 
-    console.log("8. Login concluído com sucesso");
+    console.log("7. Login concluído com sucesso");
 
     // 5. Retornar resposta com token
     const response = NextResponse.json({
