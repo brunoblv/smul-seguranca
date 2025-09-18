@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Aplicação Next.js
+  app:
+    build: .
+    container_name: seguranca-smul-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://seguranca_user:seguranca_password@db:3306/seguranca_smul
+      - JWT_SECRET=seguranca-smul-secret-key-2024-docker
+      - LDAP_SERVER=${LDAP_SERVER:-ldap://10.10.65.242}
+      - LDAP_DOMAIN=${LDAP_DOMAIN:-@rede.sp}
+      - LDAP_BASE=${LDAP_BASE:-DC=rede,DC=sp}
+      - LDAP_USER=${LDAP_USER:-usr_smdu_freenas}
+      - LDAP_PASS=${LDAP_PASS:-senha}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - seguranca-network
+
+  # Banco de dados MySQL
+  db:
+    image: mysql:8.0
+    container_name: seguranca-smul-db
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_2024
+      MYSQL_DATABASE: seguranca_smul
+      MYSQL_USER: seguranca_user
+      MYSQL_PASSWORD: seguranca_password
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d
+      - ./database/backups:/backups
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_2024"]
+      timeout: 20s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - seguranca-network
+
+  # Proxy reverso Nginx
+  nginx:
+    image: nginx:alpine
+    container_name: seguranca-smul-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - seguranca-network
+
+  # Redis para cache (opcional)
+  redis:
+    image: redis:7-alpine
+    container_name: seguranca-smul-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - seguranca-network
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  seguranca-network:
+    driver: bridge
