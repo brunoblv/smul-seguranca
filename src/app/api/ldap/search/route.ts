@@ -25,6 +25,10 @@ interface UserResult {
   email?: string;
   displayName?: string;
   department?: string;
+  userAccountControl?: string;
+  lockoutTime?: string;
+  lastLogonTimestamp?: string;
+  lastLogon?: string;
   error?: string;
 }
 
@@ -100,6 +104,10 @@ async function searchLDAP(filter: string): Promise<UserResult> {
           "telephoneNumber",
           "mobile",
           "company",
+          "userAccountControl",
+          "lockoutTime",
+          "lastLogonTimestamp",
+          "lastLogon",
         ],
       };
 
@@ -150,6 +158,10 @@ async function searchLDAP(filter: string): Promise<UserResult> {
               email: userData.mail,
               displayName: userData.displayName || userData.cn,
               department: userData.department || userData.ou,
+              userAccountControl: userData.userAccountControl,
+              lockoutTime: userData.lockoutTime,
+              lastLogonTimestamp: userData.lastLogonTimestamp,
+              lastLogon: userData.lastLogon,
               departmentSgu,
             });
           } else {
@@ -161,6 +173,41 @@ async function searchLDAP(filter: string): Promise<UserResult> {
       });
     });
   });
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const username = searchParams.get("username");
+
+    if (!username) {
+      return NextResponse.json(
+        { error: "Username é obrigatório" },
+        { status: 400 }
+      );
+    }
+
+    // Cria o filtro LDAP para username
+    const filter = createLDAPFilter("username", username);
+
+    // Realiza a busca
+    const result = await searchLDAP(filter);
+
+    return NextResponse.json({
+      success: true,
+      data: result.exists ? [result] : [],
+    });
+  } catch (error) {
+    console.error("Erro na API de busca LDAP:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Erro interno do servidor ao conectar com LDAP",
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

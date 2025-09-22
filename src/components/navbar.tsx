@@ -52,6 +52,12 @@ export function Navbar() {
               >
                 Gerenciar Usuários
               </a>
+              <a
+                href="/comparacao-mensal"
+                className="transition-colors hover:text-gray-900 text-gray-600"
+              >
+                Comparação Mensal
+              </a>
             </>
           )}
           <LogoutButton />
