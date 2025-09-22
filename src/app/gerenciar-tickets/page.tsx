@@ -15,14 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import * as XLSX from "xlsx";
 
 interface Ticket {
@@ -139,8 +131,7 @@ export default function GerenciarTickets() {
     salvarFiltrosNoLocalStorage(novosFiltros);
   };
 
-  const [pesquisaIndividual, setPesquisaIndividual] = useState("");
-  const [pesquisaLote, setPesquisaLote] = useState("");
+  const [pesquisaUsuarios, setPesquisaUsuarios] = useState("");
   const [paginacao, setPaginacao] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -265,37 +256,11 @@ export default function GerenciarTickets() {
     }, 3000);
   };
 
-  // Pesquisa individual
-  const handlePesquisaIndividual = async () => {
-    if (!pesquisaIndividual.trim()) return;
+  // Pesquisa de usuários (individual ou em lote)
+  const handlePesquisaUsuarios = async () => {
+    if (!pesquisaUsuarios.trim()) return;
 
-    try {
-      const response = await fetch("/api/tickets/pesquisa-individual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: pesquisaIndividual.trim() }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert("Pesquisa realizada com sucesso!");
-        setPesquisaIndividual("");
-        carregarDados(1);
-      } else {
-        alert(`Erro: ${data.message}`);
-      }
-    } catch (error) {
-      console.error("Erro na pesquisa individual:", error);
-      alert("Erro na pesquisa individual");
-    }
-  };
-
-  // Pesquisa em lote
-  const handlePesquisaLote = async () => {
-    if (!pesquisaLote.trim()) return;
-
-    const usernames = pesquisaLote
+    const usernames = pesquisaUsuarios
       .split("\n")
       .map((u) => u.trim())
       .filter((u) => u.length > 0);
@@ -312,17 +277,19 @@ export default function GerenciarTickets() {
       const data = await response.json();
 
       if (data.success) {
+        const quantidade = usernames.length;
+        const texto = quantidade === 1 ? "usuário" : "usuários";
         alert(
-          `Pesquisa em lote concluída: ${data.data.tickets_criados} tickets processados`
+          `Pesquisa concluída: ${data.data.tickets_criados} tickets processados de ${quantidade} ${texto}`
         );
-        setPesquisaLote("");
+        setPesquisaUsuarios("");
         carregarDados(1);
       } else {
         alert(`Erro: ${data.message}`);
       }
     } catch (error) {
-      console.error("Erro na pesquisa em lote:", error);
-      alert("Erro na pesquisa em lote");
+      console.error("Erro na pesquisa de usuários:", error);
+      alert("Erro na pesquisa de usuários");
     }
   };
 
@@ -717,65 +684,165 @@ export default function GerenciarTickets() {
     <div className="container mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Gerenciar Tickets</h1>
 
-      {/* Estatísticas */}
+      {/* Dashboard de Estatísticas */}
       {estatisticas && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Total de Tickets</CardTitle>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total de Tickets */}
+          <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-blue-700">
+                Total de Tickets
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
+                <svg
+                  className="h-4 w-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{estatisticas.total}</div>
+              <div className="text-3xl font-bold text-blue-900">
+                {estatisticas.total}
+              </div>
+              <p className="text-xs text-blue-600 mt-1">tickets no sistema</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Por Status Ticket</CardTitle>
+          {/* Status Ticket */}
+          <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-green-700">
+                Status do Ticket
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
+                <svg
+                  className="h-4 w-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {estatisticas.porStatusTicket.map((item) => (
                   <div
                     key={item.status_ticket}
-                    className="flex justify-between"
+                    className="flex items-center justify-between"
                   >
-                    <span className="text-sm">{item.status_ticket}:</span>
-                    <span className="font-bold">
-                      {item._count.status_ticket}
+                    <span className="text-sm font-medium text-green-800">
+                      {formatarStatus(item.status_ticket, "ticket")}
                     </span>
+                    <Badge
+                      variant="secondary"
+                      className="bg-green-200 text-green-800"
+                    >
+                      {item._count.status_ticket}
+                    </Badge>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Por Status Rede</CardTitle>
+          {/* Status Rede */}
+          <Card className="relative overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-orange-700">
+                Status da Rede
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center">
+                <svg
+                  className="h-4 w-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"
+                  />
+                </svg>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {estatisticas.porStatusLDAP.map((item) => (
-                  <div key={item.status_ldap} className="flex justify-between">
-                    <span className="text-sm">{item.status_ldap}:</span>
-                    <span className="font-bold">{item._count.status_ldap}</span>
+                  <div
+                    key={item.status_ldap}
+                    className="flex items-center justify-between"
+                  >
+                    <span className="text-sm font-medium text-orange-800">
+                      {formatarStatus(item.status_ldap, "ldap")}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className="bg-orange-200 text-orange-800"
+                    >
+                      {item._count.status_ldap}
+                    </Badge>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Por Status SGU</CardTitle>
+          {/* Status SGU */}
+          <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-purple-700">
+                Status do SGU
+              </CardTitle>
+              <div className="h-8 w-8 rounded-full bg-purple-500 flex items-center justify-center">
+                <svg
+                  className="h-4 w-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                  />
+                </svg>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {estatisticas.porStatusSGU.map((item) => (
-                  <div key={item.status_sgu} className="flex justify-between">
-                    <span className="text-sm">{item.status_sgu}:</span>
-                    <span className="font-bold">{item._count.status_sgu}</span>
+                  <div
+                    key={item.status_sgu}
+                    className="flex items-center justify-between"
+                  >
+                    <span className="text-sm font-medium text-purple-800">
+                      {formatarStatus(item.status_sgu, "sgu")}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className="bg-purple-200 text-purple-800"
+                    >
+                      {item._count.status_sgu}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -784,44 +851,30 @@ export default function GerenciarTickets() {
         </div>
       )}
 
-      {/* Pesquisas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Pesquisa Individual */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pesquisa Individual</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Digite o username"
-              value={pesquisaIndividual}
-              onChange={(e) => setPesquisaIndividual(e.target.value)}
-            />
-            <Button onClick={handlePesquisaIndividual} className="w-full">
-              Pesquisar
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Pesquisa em Lote */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pesquisa em Lote</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      {/* Pesquisa de Usuários */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Pesquisar Usuários</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="pesquisa-usuarios">
+              Digite o(s) username(s) - um por linha para múltiplos usuários
+            </Label>
             <textarea
-              className="w-full p-2 border rounded-md"
+              id="pesquisa-usuarios"
+              className="w-full p-2 border rounded-md mt-1"
               rows={4}
-              placeholder="Digite os usernames, um por linha"
-              value={pesquisaLote}
-              onChange={(e) => setPesquisaLote(e.target.value)}
+              placeholder="Exemplo:&#10;d123456&#10;d789012&#10;d345678"
+              value={pesquisaUsuarios}
+              onChange={(e) => setPesquisaUsuarios(e.target.value)}
             />
-            <Button onClick={handlePesquisaLote} className="w-full">
-              Pesquisar em Lote
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          <Button onClick={handlePesquisaUsuarios} className="w-full">
+            Pesquisar
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Filtros */}
       <Card>
