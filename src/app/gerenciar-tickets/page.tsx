@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "./table-styles.css";
 import { formatarDataBrasileira, formatarDataSimples } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
@@ -152,54 +152,57 @@ export default function GerenciarTickets() {
   });
 
   // Carregar tickets e estatísticas
-  const carregarDados = async (page = 1) => {
-    try {
-      setLoading(true);
+  const carregarDados = useCallback(
+    async (page = 1) => {
+      try {
+        setLoading(true);
 
-      // Carregar tickets
-      const params = new URLSearchParams();
-      if (filtros.status_ticket)
-        params.append("status_ticket", filtros.status_ticket);
-      if (filtros.status_ldap)
-        params.append("status_ldap", filtros.status_ldap);
-      if (filtros.status_sgu) params.append("status_sgu", filtros.status_sgu);
-      if (filtros.dias_sem_logar_min)
-        params.append("dias_sem_logar_min", filtros.dias_sem_logar_min);
-      if (filtros.fechado) params.append("fechado", filtros.fechado);
-      if (filtros.acao && filtros.acao.trim() !== "")
-        params.append("acao", filtros.acao);
-      params.append("page", page.toString());
-      params.append("limit", "5");
+        // Carregar tickets
+        const params = new URLSearchParams();
+        if (filtros.status_ticket)
+          params.append("status_ticket", filtros.status_ticket);
+        if (filtros.status_ldap)
+          params.append("status_ldap", filtros.status_ldap);
+        if (filtros.status_sgu) params.append("status_sgu", filtros.status_sgu);
+        if (filtros.dias_sem_logar_min)
+          params.append("dias_sem_logar_min", filtros.dias_sem_logar_min);
+        if (filtros.fechado) params.append("fechado", filtros.fechado);
+        if (filtros.acao && filtros.acao.trim() !== "")
+          params.append("acao", filtros.acao);
+        params.append("page", page.toString());
+        params.append("limit", "5");
 
-      const [ticketsRes, estatisticasRes] = await Promise.all([
-        fetch(`/api/tickets?${params.toString()}`),
-        fetch("/api/tickets/estatisticas"),
-      ]);
+        const [ticketsRes, estatisticasRes] = await Promise.all([
+          fetch(`/api/tickets?${params.toString()}`),
+          fetch("/api/tickets/estatisticas"),
+        ]);
 
-      const ticketsData = await ticketsRes.json();
-      const estatisticasData = await estatisticasRes.json();
+        const ticketsData = await ticketsRes.json();
+        const estatisticasData = await estatisticasRes.json();
 
-      if (ticketsData.success) {
-        setTickets(ticketsData.data);
-        if (ticketsData.pagination) {
-          setPaginacao(ticketsData.pagination);
+        if (ticketsData.success) {
+          setTickets(ticketsData.data);
+          if (ticketsData.pagination) {
+            setPaginacao(ticketsData.pagination);
+          }
         }
-      }
 
-      if (estatisticasData.success) {
-        setEstatisticas(estatisticasData.data);
+        if (estatisticasData.success) {
+          setEstatisticas(estatisticasData.data);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [filtros]
+  );
 
   // Carregar dados iniciais apenas uma vez
   useEffect(() => {
     carregarDados(1);
-  }, []); // Array vazio = executa apenas uma vez
+  }, [carregarDados]); // Incluir carregarDados como dependência
 
   // useEffect removido para desabilitar pesquisa automática
   // useEffect(() => {
@@ -290,35 +293,6 @@ export default function GerenciarTickets() {
     } catch (error) {
       console.error("Erro na pesquisa de usuários:", error);
       alert("Erro na pesquisa de usuários");
-    }
-  };
-
-  // Atualizar status do ticket
-  const atualizarStatusTicket = async (
-    username: string,
-    novoStatus: string
-  ) => {
-    try {
-      const response = await fetch("/api/tickets", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          status_ticket: novoStatus,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert("Status atualizado com sucesso!");
-        carregarDados(paginacao.currentPage);
-      } else {
-        alert(`Erro: ${data.message}`);
-      }
-    } catch (error) {
-      console.error("Erro ao atualizar status:", error);
-      alert("Erro ao atualizar status");
     }
   };
 
@@ -445,6 +419,7 @@ export default function GerenciarTickets() {
         BLOQUEAR: "Bloquear",
         DESBLOQUEAR: "Desbloquear",
         USUARIO_EXCLUIDO: "Usuário excluído",
+        RETIRAR_ACESSOS: "Retirar acessos da outra unidade",
       },
     };
 

@@ -13,7 +13,7 @@ interface UsuarioSgu {
 
 export async function POST(request: NextRequest) {
   try {
-    const { usuarios, tipo, observacoes } = await request.json();
+    const { usuarios, tipo, observacoes, forcarCriacao } = await request.json();
 
     if (!usuarios || !Array.isArray(usuarios) || usuarios.length === 0) {
       return NextResponse.json(
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
 
     const ticketsCriados = [];
     const erros = [];
+    const ticketsExistentes = [];
 
     for (const usuario of usuarios) {
       try {
@@ -48,12 +49,33 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Lógica diferente para exonerados vs transferidos
         if (ticketExistente) {
-          erros.push({
-            usuario: usernameLDAP,
-            erro: "Já existe um ticket aberto para este usuário",
-          });
-          continue;
+          if (tipo === "exonerados") {
+            // Para exonerados, só cria se forçar ou se não forçar
+            if (!forcarCriacao) {
+              ticketsExistentes.push({
+                usuario: usernameLDAP,
+                nome: usuario.cpNome,
+                ticketId: ticketExistente.id,
+                acao: ticketExistente.acao,
+                dataCriacao: ticketExistente.data_criacao,
+              });
+              continue;
+            }
+          } else {
+            // Para transferidos, sempre permite criar (mudança de unidade)
+            // Continua para criar o ticket
+          }
+        }
+
+        // Determinar ação baseada no tipo
+        let acao;
+        if (tipo === "exonerados") {
+          acao = "EXCLUIR";
+        } else {
+          // Para transferidos (mudança de unidade)
+          acao = "RETIRAR_ACESSOS";
         }
 
         // Criar novo ticket
@@ -68,7 +90,7 @@ export async function POST(request: NextRequest) {
             empresa: "SMUL",
             setor_sgu:
               usuario.sigla || usuario.nome_unidade || usuario.cpnomesetor2,
-            acao: tipo === "exonerados" ? "EXCLUIR" : "TRANSFERIR",
+            acao: acao,
             fechado: false,
             criado_por: "Sistema de Comparação Mensal",
             data_criacao: new Date(),
@@ -86,6 +108,18 @@ export async function POST(request: NextRequest) {
           erro: "Erro interno ao criar ticket",
         });
       }
+    }
+
+    // Se há tickets existentes e não foi forçado, retornar erro especial
+    if (ticketsExistentes.length > 0 && !forcarCriacao) {
+      return NextResponse.json({
+        success: false,
+        message: "Existem tickets abertos para alguns usuários",
+        ticketsExistentes: ticketsExistentes,
+        ticketsCriados: ticketsCriados.length,
+        totalUsuarios: usuarios.length,
+        erros: erros.length > 0 ? erros : undefined,
+      });
     }
 
     return NextResponse.json({

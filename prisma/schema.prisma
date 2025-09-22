@@ -180,6 +180,7 @@ enum AcaoTicket {
     BLOQUEAR
     DESBLOQUEAR
     USUARIO_EXCLUIDO
+    RETIRAR_ACESSOS
 
     @@map("AcaoTicket")
 }

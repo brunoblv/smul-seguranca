@@ -237,7 +237,8 @@ export default function ComparacaoMensal() {
 
   const abrirTicketsEmLote = async (
     usuarios: UsuarioSgu[],
-    tipo: "exonerados" | "transferidos"
+    tipo: "exonerados" | "transferidos",
+    forcarCriacao: boolean = false
   ) => {
     try {
       const response = await fetch("/api/tickets/criar-lote", {
@@ -252,6 +253,7 @@ export default function ComparacaoMensal() {
             tipo === "exonerados"
               ? "Usuário identificado como exonerado/transferido na comparação mensal"
               : "Usuário identificado como transferido de unidade na comparação mensal",
+          forcarCriacao,
         }),
       });
 
@@ -261,6 +263,23 @@ export default function ComparacaoMensal() {
         alert(`${data.ticketsCriados} tickets criados com sucesso!`);
         // Recarregar a comparação
         compararTabelas();
+      } else if (data.ticketsExistentes && data.ticketsExistentes.length > 0) {
+        // Mostrar modal de confirmação para tickets existentes
+        const confirmar = confirm(
+          `Existem ${
+            data.ticketsExistentes.length
+          } tickets já abertos para alguns usuários:\n\n${data.ticketsExistentes
+            .map(
+              (t: any) =>
+                `- ${t.usuario} (${t.nome}): Ticket #${t.ticketId} - ${t.acao}`
+            )
+            .join("\n")}\n\nDeseja criar novos tickets mesmo assim?`
+        );
+
+        if (confirmar) {
+          // Chamar novamente com forcarCriacao = true
+          await abrirTicketsEmLote(usuarios, tipo, true);
+        }
       } else {
         alert(`Erro ao criar tickets: ${data.message}`);
       }
