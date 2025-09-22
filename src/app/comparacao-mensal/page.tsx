@@ -211,9 +211,6 @@ export default function ComparacaoMensal() {
       const data = await response.json();
 
       if (data.success) {
-        console.log("Dados recebidos da API:", data.data);
-        console.log("Exonerados:", data.data.exonerados.length);
-        console.log("Transferidos:", data.data.transferidos.length);
         setResultado(data.data);
 
         // Verificar status LDAP de todos os usuários encontrados
@@ -460,10 +457,6 @@ export default function ComparacaoMensal() {
                             usuario.sigla
                               ?.toLowerCase()
                               .includes(filtros.unidade.toLowerCase());
-                          console.log(
-                            `Usuário ${usuario.cpRF} passa no filtro:`,
-                            passaFiltro
-                          );
                           return passaFiltro;
                         })
                         .map((usuario) => (

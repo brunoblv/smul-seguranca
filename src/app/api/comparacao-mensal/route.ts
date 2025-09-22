@@ -146,8 +146,6 @@ export async function POST(request: NextRequest) {
       (usuario) => !mapaAtual.has(usuario.cpRF)
     );
 
-    console.log("Usuários exonerados encontrados:", exonerados.length);
-    console.log("Primeiros 5 exonerados:", exonerados.slice(0, 5));
 
     // Encontrar usuários transferidos (têm cpEspecie = "Remocao" na tabela atual)
     const transferidos: Array<{
@@ -158,12 +156,6 @@ export async function POST(request: NextRequest) {
       sigla_atual?: string;
     }> = [];
 
-    // Verificar se há usuários com cpEspecie diferente de null/undefined
-    const usuariosComEspecie = usuariosAtualArray.filter((u) => u.cpEspecie);
-    console.log("Usuários com cpEspecie definido:", usuariosComEspecie.length);
-    console.log("Valores únicos de cpEspecie:", [
-      ...new Set(usuariosAtualArray.map((u) => u.cpEspecie)),
-    ]);
 
     // Contar usuários com cpEspecie = "Remocao" (testando diferentes variações)
     const usuariosComRemocao1 = usuariosAtualArray.filter(
@@ -176,30 +168,6 @@ export async function POST(request: NextRequest) {
       (u) => u.cpEspecie && u.cpEspecie.toLowerCase().includes("remocao")
     );
 
-    console.log(
-      "Usuários com cpEspecie = 'Remocao':",
-      usuariosComRemocao1.length
-    );
-    console.log(
-      "Usuários com cpEspecie = 'REMOCAO':",
-      usuariosComRemocao2.length
-    );
-    console.log(
-      "Usuários com cpEspecie contendo 'remocao':",
-      usuariosComRemocao3.length
-    );
-    console.log(
-      "Primeiros 5 com Remocao (variação 1):",
-      usuariosComRemocao1.slice(0, 5)
-    );
-    console.log(
-      "Primeiros 5 com Remocao (variação 2):",
-      usuariosComRemocao2.slice(0, 5)
-    );
-    console.log(
-      "Primeiros 5 com Remocao (variação 3):",
-      usuariosComRemocao3.slice(0, 5)
-    );
 
     // Usar a variação que encontrar usuários
     const usuariosComRemocao =
@@ -211,7 +179,6 @@ export async function POST(request: NextRequest) {
 
     usuariosComRemocao.forEach((usuarioAtual) => {
       const usuarioAnterior = mapaAnterior.get(usuarioAtual.cpRF);
-      console.log(`Processando usuário ${usuarioAtual.cpRF} com Remocao`);
 
       transferidos.push({
         usuario: usuarioAtual,
