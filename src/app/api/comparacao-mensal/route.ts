@@ -146,7 +146,6 @@ export async function POST(request: NextRequest) {
       (usuario) => !mapaAtual.has(usuario.cpRF)
     );
 
-
     // Encontrar usuários transferidos (têm cpEspecie = "Remocao" na tabela atual)
     const transferidos: Array<{
       usuario: UsuarioSgu;
@@ -155,7 +154,6 @@ export async function POST(request: NextRequest) {
       sigla_anterior?: string;
       sigla_atual?: string;
     }> = [];
-
 
     // Contar usuários com cpEspecie = "Remocao" (testando diferentes variações)
     const usuariosComRemocao1 = usuariosAtualArray.filter(
@@ -168,7 +166,6 @@ export async function POST(request: NextRequest) {
       (u) => u.cpEspecie && u.cpEspecie.toLowerCase().includes("remocao")
     );
 
-
     // Usar a variação que encontrar usuários
     const usuariosComRemocao =
       usuariosComRemocao3.length > 0
@@ -180,15 +177,26 @@ export async function POST(request: NextRequest) {
     usuariosComRemocao.forEach((usuarioAtual) => {
       const usuarioAnterior = mapaAnterior.get(usuarioAtual.cpRF);
 
-      transferidos.push({
-        usuario: usuarioAtual,
-        unidade_anterior: usuarioAnterior
-          ? usuarioAnterior.nome_unidade || usuarioAnterior.cpnomesetor2
-          : "Unidade anterior não encontrada",
-        unidade_atual: usuarioAtual.nome_unidade || usuarioAtual.cpnomesetor2,
-        sigla_anterior: usuarioAnterior?.sigla,
-        sigla_atual: usuarioAtual.sigla,
-      });
+      // Limpar siglas para comparação
+      const siglaAtualLimpa = usuarioAtual.sigla
+        ? usuarioAtual.sigla.trim().replace(/[\r\n\t\0]/g, "")
+        : null;
+      const siglaAnteriorLimpa = usuarioAnterior?.sigla
+        ? usuarioAnterior.sigla.trim().replace(/[\r\n\t\0]/g, "")
+        : null;
+
+      // Só adicionar se as siglas forem diferentes
+      if (siglaAtualLimpa !== siglaAnteriorLimpa) {
+        transferidos.push({
+          usuario: usuarioAtual,
+          unidade_anterior: usuarioAnterior
+            ? usuarioAnterior.nome_unidade || usuarioAnterior.cpnomesetor2
+            : "Unidade anterior não encontrada",
+          unidade_atual: usuarioAtual.nome_unidade || usuarioAtual.cpnomesetor2,
+          sigla_anterior: siglaAnteriorLimpa,
+          sigla_atual: siglaAtualLimpa,
+        });
+      }
     });
 
     const resultado: ComparacaoResultado = {
@@ -197,13 +205,6 @@ export async function POST(request: NextRequest) {
       total_exonerados: exonerados.length,
       total_transferidos: transferidos.length,
     };
-
-    console.log("Resultado da comparação:", {
-      exonerados: exonerados.length,
-      transferidos: transferidos.length,
-    });
-    console.log("Transferidos encontrados:", transferidos.length);
-    console.log("Primeiros 5 transferidos:", transferidos.slice(0, 5));
 
     return NextResponse.json({
       success: true,

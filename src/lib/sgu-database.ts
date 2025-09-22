@@ -73,8 +73,7 @@ export async function buscarDepartamentoSgu(
           .replace(/[\r\n\t\0]/g, "");
       }
 
-      const departamento =
-        siglaLimpa && siglaLimpa !== "" ? siglaLimpa : null;
+      const departamento = siglaLimpa && siglaLimpa !== "" ? siglaLimpa : null;
 
       return departamento;
     }
@@ -85,7 +84,6 @@ export async function buscarDepartamentoSgu(
     return null;
   }
 }
-
 
 // Buscar múltiplos departamentos de uma vez
 export async function buscarDepartamentosSgu(
@@ -111,7 +109,6 @@ export async function buscarDepartamentosSgu(
        WHERE t.cpUsuarioRede IN (${placeholders})`,
       usernames
     );
-    console.log(`JOIN em lote com tblUnidades.uid executado:`, rows);
 
     // Converter resultado para objeto
     const departamentos: Record<string, string | null> = {};
@@ -134,13 +131,6 @@ export async function buscarDepartamentosSgu(
         ? row.sigla.trim().replace(/[\r\n\t]/g, "")
         : null;
       const departamento = siglaLimpa && siglaLimpa !== "" ? siglaLimpa : null;
-      console.log(
-        `Departamento SGU para ${row.cpUsuarioRede}: ${departamento} (sigla: ${
-          row.sigla
-        }, siglaLimpa: ${siglaLimpa || "N/A"}, nome: ${row.nome}, cpUnid: ${
-          row.cpUnid
-        })`
-      );
       departamentos[row.cpUsuarioRede] = departamento;
     });
 
@@ -162,7 +152,6 @@ export async function fecharConexaoSgu() {
     if (pool) {
       await pool.end();
       pool = null;
-      console.log("Conexão SGU fechada");
     }
   } catch (error) {
     console.error("Erro ao fechar conexão SGU:", error);
