@@ -135,6 +135,7 @@ export async function listarTickets(filtros?: {
   status_sgu?: StatusSGU;
   dias_sem_logar_min?: number;
   fechado?: boolean;
+  acao?: AcaoTicket;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -167,6 +168,11 @@ export async function listarTickets(filtros?: {
     if (filtros?.fechado !== undefined) {
       where.fechado = filtros.fechado;
     }
+
+    if (filtros?.acao) {
+      where.acao = filtros.acao;
+    }
+    // Não filtrar por acao se não especificado - deixar o Prisma lidar com valores inválidos
 
     // Configurações de paginação
     const page = filtros?.page || 1;

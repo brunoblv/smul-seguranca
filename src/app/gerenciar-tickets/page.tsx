@@ -6,6 +6,7 @@ import { formatarDataBrasileira, formatarDataSimples } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -65,17 +66,79 @@ interface Estatisticas {
   porStatusSGU: Array<{ status_sgu: string; _count: { status_sgu: number } }>;
 }
 
+interface TicketExport {
+  id: number;
+  username: string;
+  nome: string;
+  email?: string;
+  status_ticket: string;
+  status_ldap: string;
+  status_sgu: string;
+  ultimo_login?: string;
+  dias_sem_logar?: number;
+  empresa?: string;
+  setor_sgu?: string;
+  acao?: string;
+  fechado: boolean;
+  criado_por?: string;
+  fechado_por?: string;
+  data_criacao: string;
+  data_fechamento?: string;
+  observacoes?: string;
+}
+
 export default function GerenciarTickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState({
-    status_ticket: "",
-    status_ldap: "",
-    status_sgu: "",
-    dias_sem_logar_min: "",
-    fechado: "false", // Por padrão, mostrar apenas não fechados
-  });
+
+  // Função para carregar filtros do localStorage
+  const carregarFiltrosDoLocalStorage = () => {
+    if (typeof window !== "undefined") {
+      const filtrosSalvos = localStorage.getItem("filtros-tickets");
+      if (filtrosSalvos) {
+        try {
+          return JSON.parse(filtrosSalvos);
+        } catch (error) {
+          console.error("Erro ao carregar filtros do localStorage:", error);
+        }
+      }
+    }
+    return {
+      status_ticket: "",
+      status_ldap: "",
+      status_sgu: "",
+      dias_sem_logar_min: "",
+      fechado: "false", // Por padrão, mostrar apenas não fechados
+      acao: "", // Filtro para ação do ticket
+    };
+  };
+
+  const [filtros, setFiltros] = useState(carregarFiltrosDoLocalStorage);
+
+  // useEffect para carregar filtros após a hidratação
+  useEffect(() => {
+    const filtrosCarregados = carregarFiltrosDoLocalStorage();
+    setFiltros(filtrosCarregados);
+  }, []);
+
+  // Função para salvar filtros no localStorage
+  const salvarFiltrosNoLocalStorage = (novosFiltros: typeof filtros) => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("filtros-tickets", JSON.stringify(novosFiltros));
+      } catch (error) {
+        console.error("Erro ao salvar filtros no localStorage:", error);
+      }
+    }
+  };
+
+  // Função para atualizar filtros e salvar no localStorage
+  const atualizarFiltros = (novosFiltros: typeof filtros) => {
+    setFiltros(novosFiltros);
+    salvarFiltrosNoLocalStorage(novosFiltros);
+  };
+
   const [pesquisaIndividual, setPesquisaIndividual] = useState("");
   const [pesquisaLote, setPesquisaLote] = useState("");
   const [paginacao, setPaginacao] = useState({
@@ -112,6 +175,8 @@ export default function GerenciarTickets() {
       if (filtros.dias_sem_logar_min)
         params.append("dias_sem_logar_min", filtros.dias_sem_logar_min);
       if (filtros.fechado) params.append("fechado", filtros.fechado);
+      if (filtros.acao && filtros.acao.trim() !== "")
+        params.append("acao", filtros.acao);
       params.append("page", page.toString());
       params.append("limit", "5");
 
@@ -140,9 +205,15 @@ export default function GerenciarTickets() {
     }
   };
 
+  // Carregar dados iniciais apenas uma vez
   useEffect(() => {
-    carregarDados(1); // Sempre voltar para a primeira página quando filtrar
-  }, [filtros]);
+    carregarDados(1);
+  }, []); // Array vazio = executa apenas uma vez
+
+  // useEffect removido para desabilitar pesquisa automática
+  // useEffect(() => {
+  //   carregarDados(1); // Sempre voltar para a primeira página quando filtrar
+  // }, [filtros]);
 
   // Funções de navegação de página
   const irParaPagina = (pagina: number) => {
@@ -161,6 +232,14 @@ export default function GerenciarTickets() {
     if (paginacao.currentPage > 1) {
       irParaPagina(paginacao.currentPage - 1);
     }
+  };
+
+  const primeiraPagina = () => {
+    irParaPagina(1);
+  };
+
+  const ultimaPagina = () => {
+    irParaPagina(paginacao.totalPages);
   };
 
   // Funções para controlar expansão das linhas
@@ -295,7 +374,15 @@ export default function GerenciarTickets() {
         // Atualizar o ticket localmente sem recarregar a página
         setTickets((prevTickets) =>
           prevTickets.map((ticket) =>
-            ticket.username === username ? { ...ticket, acao: acao } : ticket
+            ticket.username === username
+              ? {
+                  ...ticket,
+                  acao: acao,
+                  data_alteracao:
+                    data.data?.data_alteracao || ticket.data_alteracao,
+                  alterado_por: data.data?.alterado_por || ticket.alterado_por,
+                }
+              : ticket
           )
         );
         mostrarFeedback("success", "Ação atualizada com sucesso!");
@@ -367,7 +454,7 @@ export default function GerenciarTickets() {
     status: string,
     type: "ldap" | "sgu" | "ticket" | "acao"
   ) => {
-    const formatacoes = {
+    const formatacoes: Record<string, Record<string, string>> = {
       ldap: {
         ATIVO: "Ativo",
         BLOQUEADO: "Bloqueado",
@@ -399,10 +486,106 @@ export default function GerenciarTickets() {
   };
 
   // Função para exportar tickets para Excel
-  const exportarParaExcel = () => {
+  const exportarParaExcel = async () => {
     try {
-      // Preparar dados para exportação
-      const dadosExportacao = tickets.map((ticket) => ({
+      setLoading(true);
+
+      // Buscar todos os dados da pesquisa (sem paginação)
+      const params = new URLSearchParams();
+      if (filtros.status_ticket)
+        params.append("status_ticket", filtros.status_ticket);
+      if (filtros.status_ldap)
+        params.append("status_ldap", filtros.status_ldap);
+      if (filtros.status_sgu) params.append("status_sgu", filtros.status_sgu);
+      if (filtros.dias_sem_logar_min)
+        params.append("dias_sem_logar_min", filtros.dias_sem_logar_min);
+      if (filtros.fechado) params.append("fechado", filtros.fechado);
+      if (filtros.acao && filtros.acao.trim() !== "")
+        params.append("acao", filtros.acao);
+      // Sem paginação para buscar todos os dados
+      params.append("page", "1"); // Página 1
+      params.append("limit", "1000"); // Limite mais razoável para pegar todos os dados
+
+      console.log("Exportando com filtros:", Object.fromEntries(params));
+
+      const response = await fetch(`/api/tickets?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      console.log("Response status:", response.status);
+      console.log("Response data:", data);
+
+      if (!data.success) {
+        console.error("API Error:", data);
+        throw new Error(data.message || "Erro ao buscar dados para exportação");
+      }
+
+      const todosTickets: TicketExport[] = data.data || [];
+
+      // Se não conseguiu buscar dados da API, usar os dados da página atual como fallback
+      if (todosTickets.length === 0) {
+        console.warn(
+          "Nenhum dado retornado da API, usando dados da página atual"
+        );
+        const dadosExportacao = tickets.map((ticket: Ticket) => ({
+          ID: ticket.id,
+          Username: ticket.username,
+          Nome: ticket.nome,
+          Email: ticket.email || "",
+          "Status Ticket": formatarStatus(ticket.status_ticket, "ticket"),
+          "Status Rede": formatarStatus(ticket.status_ldap, "ldap"),
+          "Status SGU": formatarStatus(ticket.status_sgu, "sgu"),
+          "Último Login": ticket.ultimo_login
+            ? formatarDataSimples(ticket.ultimo_login)
+            : "Nunca",
+          "Dias Inativo": ticket.dias_sem_logar || 0,
+          "Sec. AD": ticket.empresa || "N/A",
+          SIGPEC: ticket.setor_sgu || "N/A",
+          Ação: ticket.acao ? formatarStatus(ticket.acao, "acao") : "Nenhuma",
+          Status: ticket.fechado ? "Fechado" : "Aberto",
+          "Criado por": ticket.criado_por || "N/A",
+          "Fechado por": ticket.fechado_por || "N/A",
+          "Data Criação": formatarDataBrasileira(ticket.data_criacao),
+          "Data Fechamento": ticket.data_fechamento
+            ? formatarDataBrasileira(ticket.data_fechamento)
+            : "N/A",
+          Observações: ticket.observacoes || "",
+        }));
+
+        // Criar workbook com dados da página atual
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(dadosExportacao);
+        XLSX.utils.book_append_sheet(wb, ws, "Tickets");
+
+        // Gerar nome do arquivo
+        const agora = new Date();
+        const dataHora = agora
+          .toLocaleString("pt-BR", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+          .replace(/[\/\s:]/g, "-");
+        const nomeArquivo = `tickets-${dataHora}.xlsx`;
+
+        // Fazer download
+        XLSX.writeFile(wb, nomeArquivo);
+        mostrarFeedback(
+          "success",
+          `Planilha exportada com sucesso! ${tickets.length} registros da página atual exportados.`
+        );
+        return;
+      }
+
+      // Preparar dados para exportação (dados completos da API)
+      const dadosExportacao = todosTickets.map((ticket: TicketExport) => ({
         ID: ticket.id,
         Username: ticket.username,
         Nome: ticket.nome,
@@ -475,10 +658,15 @@ export default function GerenciarTickets() {
       // Fazer download
       XLSX.writeFile(wb, nomeArquivo);
 
-      mostrarFeedback("success", "Planilha exportada com sucesso!");
+      mostrarFeedback(
+        "success",
+        `Planilha exportada com sucesso! ${todosTickets.length} registros exportados.`
+      );
     } catch (error) {
       console.error("Erro ao exportar planilha:", error);
       mostrarFeedback("error", "Erro ao exportar planilha");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -487,7 +675,7 @@ export default function GerenciarTickets() {
     status: string,
     type: "ldap" | "sgu" | "ticket" | "acao"
   ) => {
-    const colors = {
+    const colors: Record<string, Record<string, string>> = {
       ldap: {
         ATIVO: "border-green-200 bg-green-50 text-green-700",
         BLOQUEADO: "border-red-200 bg-red-50 text-red-700",
@@ -641,104 +829,143 @@ export default function GerenciarTickets() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Select
-              value={filtros.status_ticket || "todos"}
-              onValueChange={(value) =>
-                setFiltros({
-                  ...filtros,
-                  status_ticket: value === "todos" ? "" : value,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Status Ticket" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="PENDENTE">Pendente</SelectItem>
-                <SelectItem value="EXCLUIR">Excluir</SelectItem>
-                <SelectItem value="MANTER">Manter</SelectItem>
-                <SelectItem value="TRANSFERIR">Transferir</SelectItem>
-                <SelectItem value="TRANSFERIDO">Transferido</SelectItem>
-                <SelectItem value="SERVICO_OUTRO_ORGAO">
-                  Serviço em outro órgão
-                </SelectItem>
-                <SelectItem value="BLOQUEAR">Bloquear</SelectItem>
-                <SelectItem value="DESBLOQUEAR">Desbloquear</SelectItem>
-                <SelectItem value="USUARIO_EXCLUIDO">
-                  Usuário excluído
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="status-fechado">Status do Ticket</Label>
+                <Select
+                  value={
+                    filtros.fechado === ""
+                      ? "todos"
+                      : filtros.fechado || "false"
+                  }
+                  onValueChange={(value) =>
+                    atualizarFiltros({
+                      ...filtros,
+                      fechado: value === "todos" ? "" : value,
+                    })
+                  }
+                >
+                  <SelectTrigger id="status-fechado">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="false">Abertos</SelectItem>
+                    <SelectItem value="true">Fechados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <Select
-              value={filtros.status_ldap || "todos"}
-              onValueChange={(value) =>
-                setFiltros({
-                  ...filtros,
-                  status_ldap: value === "todos" ? "" : value,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Status Rede" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="ATIVO">Ativo</SelectItem>
-                <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
-                <SelectItem value="DESATIVO">Desativo</SelectItem>
-                <SelectItem value="NAO_ENCONTRADO">Não Encontrado</SelectItem>
-              </SelectContent>
-            </Select>
+              <div className="space-y-2">
+                <Label htmlFor="status-ldap">Status da Rede</Label>
+                <Select
+                  value={filtros.status_ldap || "todos"}
+                  onValueChange={(value) =>
+                    atualizarFiltros({
+                      ...filtros,
+                      status_ldap: value === "todos" ? "" : value,
+                    })
+                  }
+                >
+                  <SelectTrigger id="status-ldap">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="ATIVO">Ativo</SelectItem>
+                    <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
+                    <SelectItem value="DESATIVO">Desativado</SelectItem>
+                    <SelectItem value="NAO_ENCONTRADO">
+                      Não Encontrado
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <Select
-              value={filtros.status_sgu || "todos"}
-              onValueChange={(value) =>
-                setFiltros({
-                  ...filtros,
-                  status_sgu: value === "todos" ? "" : value,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Status SGU" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="ENCONTRADO">Encontrado</SelectItem>
-                <SelectItem value="NAO_ENCONTRADO">Não Encontrado</SelectItem>
-              </SelectContent>
-            </Select>
+              <div className="space-y-2">
+                <Label htmlFor="status-sgu">Status do SGU</Label>
+                <Select
+                  value={filtros.status_sgu || "todos"}
+                  onValueChange={(value) =>
+                    atualizarFiltros({
+                      ...filtros,
+                      status_sgu: value === "todos" ? "" : value,
+                    })
+                  }
+                >
+                  <SelectTrigger id="status-sgu">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="ENCONTRADO">Encontrado</SelectItem>
+                    <SelectItem value="NAO_ENCONTRADO">
+                      Não Encontrado
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <Input
-              type="number"
-              placeholder="Dias sem logar (mínimo)"
-              value={filtros.dias_sem_logar_min}
-              onChange={(e) =>
-                setFiltros({ ...filtros, dias_sem_logar_min: e.target.value })
-              }
-            />
+              <div className="space-y-2">
+                <Label htmlFor="dias-sem-logar">Dias sem Logar (Mínimo)</Label>
+                <Input
+                  id="dias-sem-logar"
+                  type="number"
+                  placeholder="Digite o número de dias"
+                  value={filtros.dias_sem_logar_min}
+                  onChange={(e) =>
+                    atualizarFiltros({
+                      ...filtros,
+                      dias_sem_logar_min: e.target.value,
+                    })
+                  }
+                />
+              </div>
 
-            <Select
-              value={filtros.fechado || "false"}
-              onValueChange={(value) =>
-                setFiltros({
-                  ...filtros,
-                  fechado: value === "todos" ? "" : value,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Status do Ticket" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="false">Abertos</SelectItem>
-                <SelectItem value="true">Fechados</SelectItem>
-              </SelectContent>
-            </Select>
+              <div className="space-y-2">
+                <Label htmlFor="acao-ticket">Ação do Ticket</Label>
+                <Select
+                  value={filtros.acao || "todos"}
+                  onValueChange={(value) =>
+                    atualizarFiltros({
+                      ...filtros,
+                      acao: value === "todos" ? "" : value,
+                    })
+                  }
+                >
+                  <SelectTrigger id="acao-ticket">
+                    <SelectValue placeholder="Selecione a ação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="PENDENTE">Pendente</SelectItem>
+                    <SelectItem value="EXCLUIR">Excluir</SelectItem>
+                    <SelectItem value="MANTER">Manter</SelectItem>
+                    <SelectItem value="TRANSFERIR">Transferir</SelectItem>
+                    <SelectItem value="TRANSFERIDO">Transferido</SelectItem>
+                    <SelectItem value="SERVICO_OUTRO_ORGAO">
+                      Serviço em outro órgão
+                    </SelectItem>
+                    <SelectItem value="BLOQUEAR">Bloquear</SelectItem>
+                    <SelectItem value="DESBLOQUEAR">Desbloquear</SelectItem>
+                    <SelectItem value="USUARIO_EXCLUIDO">
+                      Usuário excluído
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={() => carregarDados(1)}
+                className="px-8"
+                disabled={loading}
+              >
+                {loading ? "Pesquisando..." : "Pesquisar"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1194,6 +1421,16 @@ export default function GerenciarTickets() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={primeiraPagina}
+                    disabled={paginacao.currentPage === 1}
+                    title="Primeira página"
+                  >
+                    Primeira
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={paginaAnterior}
                     disabled={paginacao.currentPage === 1}
                   >
@@ -1243,6 +1480,16 @@ export default function GerenciarTickets() {
                     disabled={paginacao.currentPage === paginacao.totalPages}
                   >
                     Próxima
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={ultimaPagina}
+                    disabled={paginacao.currentPage === paginacao.totalPages}
+                    title="Última página"
+                  >
+                    Última
                   </Button>
                 </div>
               </div>

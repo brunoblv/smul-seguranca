@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const status_sgu = searchParams.get("status_sgu");
     const dias_sem_logar_min = searchParams.get("dias_sem_logar_min");
     const fechado = searchParams.get("fechado");
+    const acao = searchParams.get("acao") as AcaoTicket;
     const username = searchParams.get("username");
     const page = searchParams.get("page");
     const limit = searchParams.get("limit");
@@ -50,6 +51,13 @@ export async function GET(request: NextRequest) {
       filtros.dias_sem_logar_min = parseInt(dias_sem_logar_min);
     if (fechado !== null && fechado !== "")
       filtros.fechado = fechado === "true";
+    if (
+      acao &&
+      acao.trim() !== "" &&
+      Object.values(AcaoTicket).includes(acao)
+    ) {
+      filtros.acao = acao;
+    }
     if (page) filtros.page = parseInt(page);
     if (limit) filtros.limit = parseInt(limit);
 

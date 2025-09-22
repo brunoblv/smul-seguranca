@@ -59,10 +59,7 @@ export default function LoginPage() {
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Sistema de Segurança SMUL
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Faça login com suas credenciais da rede SP
-          </p>
+          </h2>          
         </div>
 
         <Card>
@@ -109,13 +106,7 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 text-center text-sm text-gray-600">
-              <p>Use suas credenciais da rede SP para acessar o sistema.</p>
-              <p className="mt-2">
-                Exemplo:{" "}
-                <code className="bg-gray-100 px-2 py-1 rounded">
-                  usuario@rede.sp
-                </code>
-              </p>
+              <p>Use suas credenciais da rede SP para acessar o sistema.</p>              
             </div>
           </CardContent>
         </Card>

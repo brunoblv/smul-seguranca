@@ -34,6 +34,7 @@ export function LogoutButton() {
         size="sm"
         onClick={handleLogin}
         disabled={loading}
+        className="bg-blue-600 text-white hover:bg-blue-700"
       >
         Logar
       </Button>
