@@ -38,6 +38,12 @@ export function Navbar() {
           >
             Usuários Inativos
           </a>
+          <a
+            href="/seguranca-usuarios"
+            className="transition-colors hover:text-gray-900 text-gray-600"
+          >
+            Gerenciar Assinaturas
+          </a>
           {!loading && isAdmin && (
             <>
               <a
