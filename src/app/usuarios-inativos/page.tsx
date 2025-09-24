@@ -22,9 +22,12 @@ import { Users, Clock, Calendar, Download, RefreshCw } from "lucide-react";
 import Papa from "papaparse";
 
 interface OU {
-  dn: string;
-  name: string;
-  description?: string;
+  id: number;
+  codigo: string;
+  nome: string;
+  descricao?: string;
+  ativo: boolean;
+  ordem: number;
 }
 
 interface InactiveUser {
@@ -69,29 +72,22 @@ export default function UsuariosInativosPage() {
   const loadOUs = async () => {
     setIsLoadingOUs(true);
     try {
-      const response = await fetch("/api/ldap/ous");
+      const response = await fetch("/api/unidades-organizacionais?ativo=true");
       const data = await response.json();
 
-      if (response.ok) {
-        const ousData = data.ous || [];
-        setOus(ousData);
+      if (data.success) {
+        setOus(data.unidades);
 
         // Define SMUL como padrão se estiver disponível
-        const smulOU = ousData.find(
-          (ou) => ou.name === "SMUL" || ou.name.includes("SMUL")
-        );
+        const smulOU = data.unidades.find((ou: OU) => ou.codigo === "SMUL");
         if (smulOU) {
-          setSelectedOU(smulOU.dn);
-        } else if (ousData.length > 0) {
-          // Se SMUL não for encontrada, usa a primeira OU disponível
-          setSelectedOU(ousData[0].dn);
+          setSelectedOU(smulOU.codigo);
+        } else if (data.unidades.length > 0) {
+          setSelectedOU(data.unidades[0].codigo);
         }
-      } else {
-        alert(`Erro ao carregar OUs: ${data.error}`);
       }
     } catch (error) {
       console.error("Erro ao carregar OUs:", error);
-      alert("Erro ao carregar lista de OUs");
     } finally {
       setIsLoadingOUs(false);
     }
@@ -196,7 +192,7 @@ export default function UsuariosInativosPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Organização (OU)
+                Secretaria
               </label>
               <Select value={selectedOU} onValueChange={setSelectedOU}>
                 <SelectTrigger>
@@ -208,8 +204,8 @@ export default function UsuariosInativosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {ous.map((ou) => (
-                    <SelectItem key={ou.dn} value={ou.dn}>
-                      {ou.name}
+                    <SelectItem key={ou.id} value={ou.codigo}>
+                      {ou.codigo}
                     </SelectItem>
                   ))}
                 </SelectContent>

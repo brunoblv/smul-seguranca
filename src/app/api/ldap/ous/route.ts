@@ -110,9 +110,9 @@ export async function GET(request: NextRequest) {
 
     const ous = await searchOUs();
 
-    // Remover duplicatas baseadas no nome e ordenar
+    // Remover duplicatas baseadas no DN (que é único) e ordenar
     const uniqueOUs = ous.reduce((acc, current) => {
-      const existing = acc.find((ou) => ou.name === current.name);
+      const existing = acc.find((ou) => ou.dn === current.dn);
       if (!existing) {
         acc.push(current);
       }

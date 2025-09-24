@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { LogoutButton } from "@/components/logout-button";
 import { useAuth } from "@/hooks/useAuth";
+import { Crown } from "lucide-react";
 
 export function Navbar() {
   const { isAdmin, loading } = useAuth();
@@ -28,51 +29,54 @@ export function Navbar() {
         <nav className="flex items-center space-x-6 text-sm font-medium">
           <Link
             href="/"
-            className="transition-colors hover:text-gray-900 text-gray-600"
+            className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
           >
             Início
           </Link>
           <Link
             href="/consulta-individual"
-            className="transition-colors hover:text-gray-900 text-gray-600"
+            className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
           >
             Consulta Individual
           </Link>
           <Link
             href="/usuarios-inativos"
-            className="transition-colors hover:text-gray-900 text-gray-600"
+            className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
           >
             Usuários Inativos
           </Link>
-          <Link
-            href="/seguranca-usuarios"
-            className="transition-colors hover:text-gray-900 text-gray-600"
-          >
-            Gerenciar Assinaturas
-          </Link>
           {!loading && isAdmin && (
             <>
+              <span className="text-gray-400 flex items-center justify-center gap-1">
+                |<Crown className="h-4 w-4 text-purple-600" />
+              </span>
+              <Link
+                href="/seguranca-usuarios"
+                className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
+              >
+                Gerenciar Assinaturas
+              </Link>
               <Link
                 href="/gerenciar-tickets"
-                className="transition-colors hover:text-gray-900 text-gray-600"
+                className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
               >
                 Gerenciar Tickets
               </Link>
               <Link
                 href="/gerenciar-usuarios"
-                className="transition-colors hover:text-gray-900 text-gray-600"
+                className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
               >
                 Gerenciar Usuários
               </Link>
               <Link
                 href="/comparacao-mensal"
-                className="transition-colors hover:text-gray-900 text-gray-600"
+                className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
               >
                 Comparação Mensal
               </Link>
               <Link
                 href="/gerenciar-ous"
-                className="transition-colors hover:text-gray-900 text-gray-600"
+                className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
               >
                 Gerenciar OUs
               </Link>
