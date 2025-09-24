@@ -11,9 +11,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+// Removido - componentes não existem
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -29,13 +36,12 @@ interface UnidadeOrganizacional {
   id: number;
   codigo: string;
   nome: string;
-  descricao?: string;
   ativo: boolean;
   ordem: number;
 }
 
 export default function GerenciarOUs() {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const [ous, setOus] = useState<UnidadeOrganizacional[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,7 +52,6 @@ export default function GerenciarOUs() {
   const [formData, setFormData] = useState({
     codigo: "",
     nome: "",
-    descricao: "",
     ativo: true,
     ordem: 0,
   });
@@ -88,7 +93,6 @@ export default function GerenciarOUs() {
     setFormData({
       codigo: ou.codigo,
       nome: ou.nome,
-      descricao: ou.descricao || "",
       ativo: ou.ativo,
       ordem: ou.ordem,
     });
@@ -153,6 +157,18 @@ export default function GerenciarOUs() {
       (ou.descricao &&
         ou.descricao.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -226,50 +242,68 @@ export default function GerenciarOUs() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              {filteredOUs.map((ou) => (
-                <div
-                  key={ou.id}
-                  className="flex items-center justify-between p-4 border rounded-lg bg-white"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-slate-900">
-                        {ou.codigo}
-                      </span>
-                      <Badge variant={ou.ativo ? "default" : "secondary"}>
-                        {ou.ativo ? "Ativa" : "Inativa"}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-slate-600 font-medium">
-                      {ou.nome}
-                    </p>
-                    {ou.descricao && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        {ou.descricao}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(ou)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(ou.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {filteredOUs.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">Código</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead className="w-[100px]">Status</TableHead>
+                      <TableHead className="w-[100px]">Ordem</TableHead>
+                      <TableHead className="w-[120px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOUs.map((ou) => (
+                      <TableRow key={ou.id}>
+                        <TableCell className="font-semibold">
+                          {ou.codigo}
+                        </TableCell>
+                        <TableCell className="font-medium">{ou.nome}</TableCell>
+                        <TableCell>
+                          <Badge variant={ou.ativo ? "default" : "secondary"}>
+                            {ou.ativo ? "Ativa" : "Inativa"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {ou.ordem}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(ou)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(ou.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-500">
+                <Building className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                <p className="text-lg font-medium">Nenhuma OU encontrada</p>
+                <p className="text-sm">
+                  {searchTerm
+                    ? "Tente ajustar os filtros de busca"
+                    : "Clique em 'Nova OU' para adicionar"}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -310,27 +344,18 @@ export default function GerenciarOUs() {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="descricao">Descrição</Label>
-                <Textarea
-                  id="descricao"
-                  value={formData.descricao}
-                  onChange={(e) =>
-                    setFormData({ ...formData, descricao: e.target.value })
-                  }
-                  placeholder="Descrição opcional"
-                  rows={3}
-                />
-              </div>
+              {/* Removido campo de descrição */}
 
               <div className="flex items-center justify-between">
                 <Label htmlFor="ativo">Ativa</Label>
-                <Switch
+                <input
+                  type="checkbox"
                   id="ativo"
                   checked={formData.ativo}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, ativo: checked })
+                  onChange={(e) =>
+                    setFormData({ ...formData, ativo: e.target.checked })
                   }
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
               </div>
 
