@@ -259,7 +259,11 @@ export default function ComparacaoMensal() {
       if (data.success) {
         alert(`${data.ticketsCriados} tickets criados com sucesso!`);
         // Recarregar a comparação
-        compararTabelas();
+        if (opcoesMes.length >= 2) {
+          const mesAtual = opcoesMes[0].valor;
+          const mesAnterior = opcoesMes[1].valor;
+          compararTabelasAutomatico(mesAtual, mesAnterior);
+        }
       } else if (data.ticketsExistentes && data.ticketsExistentes.length > 0) {
         // Mostrar modal de confirmação para tickets existentes
         const confirmar = confirm(
