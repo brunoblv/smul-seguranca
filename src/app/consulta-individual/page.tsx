@@ -44,11 +44,8 @@ interface UserResult {
 }
 
 export default function ConsultaIndividual() {
-  const [searchType, setSearchType] = useState<
-    "username" | "email" | "displayName"
-  >("username");
   const [searchValue, setSearchValue] = useState("");
-  const [selectedOU, setSelectedOU] = useState<string>("all");
+  const [selectedOU, setSelectedOU] = useState<string>("SMUL");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<UserResult | null>(null);
   const [multipleResults, setMultipleResults] = useState<UserResult[]>([]);
@@ -111,7 +108,7 @@ export default function ConsultaIndividual() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          searchType,
+          searchType: "username",
           searchValue: searchValue.trim(),
           ouFilter: selectedOU && selectedOU !== "all" ? selectedOU : undefined,
         }),
@@ -162,18 +159,7 @@ export default function ConsultaIndividual() {
     setMultipleResults([]);
   };
 
-  const getSearchTypeLabel = (type: string) => {
-    switch (type) {
-      case "username":
-        return " Usuário de Rede";
-      case "email":
-        return "E-mail";
-      case "displayName":
-        return "Nome Completo";
-      default:
-        return type;
-    }
-  };
+  // Removido - agora só temos busca por username
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -205,34 +191,12 @@ export default function ConsultaIndividual() {
                 Buscar Usuário
               </CardTitle>
               <CardDescription>
-                Selecione o tipo de busca e digite o valor para pesquisar
+                Digite o usuário de rede para pesquisar
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSearch} className="space-y-4">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="searchType"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Tipo de Busca
-                  </label>
-                  <Select
-                    value={searchType}
-                    onValueChange={(
-                      value: "username" | "email" | "displayName"
-                    ) => setSearchType(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o tipo de busca" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="username">Usuário de Rede</SelectItem>
-                      <SelectItem value="email">E-mail</SelectItem>
-                      <SelectItem value="displayName">Nome Completo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Removido seletor de tipo de busca - agora só username */}
 
                 <div className="space-y-2">
                   <label
@@ -255,8 +219,7 @@ export default function ConsultaIndividual() {
                       <SelectItem value="all">Todas as OUs</SelectItem>
                       {ous.map((ou, index) => (
                         <SelectItem key={`${ou.id}-${index}`} value={ou.codigo}>
-                          {ou.codigo} - {ou.nome}
-                          {ou.descricao && ` (${ou.descricao})`}
+                          {ou.codigo}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -268,16 +231,14 @@ export default function ConsultaIndividual() {
                     htmlFor="searchValue"
                     className="text-sm font-medium text-slate-700"
                   >
-                    Valor para Busca
+                    Usuário de Rede
                   </label>
                   <Input
                     type="text"
                     id="searchValue"
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
-                    placeholder={`Digite o ${getSearchTypeLabel(
-                      searchType
-                    ).toLowerCase()}`}
+                    placeholder="Digite o usuário de rede (ex: jose.silva)"
                     required
                   />
                 </div>
@@ -459,20 +420,12 @@ export default function ConsultaIndividual() {
                     2
                   </Badge>
                   <div>
-                    <p className="font-medium text-slate-700">E-mail</p>
-                    <p>
-                      Digite o endereço de e-mail completo (ex:
-                      jose.silva@rede.sp)
+                    <p className="font-medium text-slate-700">
+                      Filtro por OU (Opcional)
                     </p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <Badge variant="outline" className="mt-0.5">
-                    3
-                  </Badge>
-                  <div>
-                    <p className="font-medium text-slate-700">Nome Completo</p>
-                    <p>Digite o nome completo do usuário (ex: José Silva)</p>
+                    <p>
+                      Selecione uma unidade organizacional para limitar a busca
+                    </p>
                   </div>
                 </div>
               </div>
