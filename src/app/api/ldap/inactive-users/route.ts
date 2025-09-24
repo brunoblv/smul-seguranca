@@ -36,6 +36,7 @@ interface InactiveUser {
 
 interface InactiveUsersRequest {
   inactiveDays: 30 | 45 | 60;
+  ou?: string;
 }
 
 // Função para escapar valores de filtro LDAP
@@ -98,7 +99,8 @@ function calculateDaysInactive(lastLogon?: string): number {
 }
 
 async function searchUsersInNetwork(
-  serverUrl: string
+  serverUrl: string,
+  ou?: string
 ): Promise<InactiveUser[]> {
   return new Promise((resolve, reject) => {
     console.log(
@@ -129,9 +131,15 @@ async function searchUsersInNetwork(
       console.log(`Conectado com sucesso ao servidor ${serverUrl}`);
 
       const users: InactiveUser[] = [];
+
+      // Construir filtro base
+      let baseFilter = `(&(objectClass=user)(objectCategory=person)(lastLogonTimestamp=*)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))`;
+
+      // Não precisamos de filtro de OU no distinguishedName pois usamos base DN específica
+
       const searchOptions: any = {
         scope: "sub" as any,
-        filter: `(&(objectClass=user)(objectCategory=person)(lastLogonTimestamp=*)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))`, // Só usuários reais ativos com lastLogonTimestamp
+        filter: baseFilter,
         attributes: [
           "sAMAccountName",
           "displayName",
@@ -146,11 +154,17 @@ async function searchUsersInNetwork(
       };
 
       console.log(
-        `Executando busca no servidor ${serverUrl} em toda a rede SP com filtro: ${searchOptions.filter}`
+        `Executando busca no servidor ${serverUrl}${
+          ou && ou !== "all" ? ` na OU ${ou}` : " em toda a rede SP"
+        } com filtro: ${searchOptions.filter}`
       );
 
-      // Usar a base DN da rede SP em vez de OU específica
-      const baseDN = process.env.LDAP_BASE || "DC=rede,DC=sp";
+      // Determinar a base DN baseada no filtro de OU (igual à busca individual)
+      let baseDN = process.env.LDAP_BASE || "DC=rede,DC=sp";
+      if (ou && ou !== "all") {
+        // Se um filtro de OU foi especificado, buscar apenas nessa OU
+        baseDN = `OU=${ou},${baseDN}`;
+      }
       client.search(baseDN, searchOptions, (err, res) => {
         if (err) {
           console.error(
@@ -212,7 +226,7 @@ async function searchUsersInNetwork(
             department: department || undefined,
             lastLogon,
             daysInactive,
-            ou: "REDE_SP", // Indica que é de toda a rede SP
+            ou: ou && ou !== "all" ? ou : "REDE_SP", // Indica a OU específica ou toda a rede SP
             server: serverUrl,
           });
         });
@@ -235,7 +249,9 @@ async function searchUsersInNetwork(
 
         res.on("end", () => {
           console.log(
-            `Servidor ${serverUrl}: encontrados ${users.length} usuários na OU ${ou}`
+            `Servidor ${serverUrl}: encontrados ${users.length} usuários${
+              ou && ou !== "all" ? ` na OU ${ou}` : " em toda a rede SP"
+            }`
           );
           client.destroy();
           resolve(users);
@@ -345,7 +361,7 @@ async function findLatestLoginForUser(
 export async function POST(request: NextRequest) {
   try {
     const body: InactiveUsersRequest = await request.json();
-    const { inactiveDays } = body;
+    const { inactiveDays, ou } = body;
 
     if (!inactiveDays) {
       return NextResponse.json(
@@ -362,13 +378,20 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(
-      `Buscando usuários inativos há mais de ${inactiveDays} dias em toda a rede SP`
+      `Buscando usuários inativos há mais de ${inactiveDays} dias${
+        ou && ou !== "all" ? ` na OU ${ou}` : " em toda a rede SP"
+      }`
     );
     console.log(`Servidores LDAP a serem consultados: ${LDAP_SERVERS.length}`);
 
+    // Se OU específica, primeiro testar sem filtro para ver se há usuários
+    if (ou && ou !== "all") {
+      console.log(`Testando busca sem filtro de OU primeiro para debug...`);
+    }
+
     // Busca usuários em todos os servidores da rede SP
     const searchPromises = LDAP_SERVERS.map((server) =>
-      searchUsersInNetwork(server)
+      searchUsersInNetwork(server, ou)
     );
     const results = await Promise.all(searchPromises);
 
@@ -464,24 +487,28 @@ export async function POST(request: NextRequest) {
     inactiveUsers.sort((a, b) => b.daysInactive - a.daysInactive);
 
     // Buscar departamentos do SGU para todos os usuários
-    try {
-      await initSguDatabase();
-      const usernames = inactiveUsers.map((user) => user.username);
-      const departamentosSgu = await buscarDepartamentosSgu(usernames);
+    if (inactiveUsers.length > 0) {
+      try {
+        await initSguDatabase();
+        const usernames = inactiveUsers.map((user) => user.username);
+        const departamentosSgu = await buscarDepartamentosSgu(usernames);
 
-      // Adicionar departamento SGU aos usuários
-      inactiveUsers.forEach((user) => {
-        user.departmentSgu = departamentosSgu[user.username] || undefined;
-      });
+        // Adicionar departamento SGU aos usuários
+        inactiveUsers.forEach((user) => {
+          user.departmentSgu = departamentosSgu[user.username] || undefined;
+        });
 
-      console.log(
-        `Departamentos SGU carregados para ${
-          Object.keys(departamentosSgu).length
-        } usuários`
-      );
-    } catch (error) {
-      console.error("Erro ao buscar departamentos SGU:", error);
-      // Continua sem os departamentos SGU
+        console.log(
+          `Departamentos SGU carregados para ${
+            Object.keys(departamentosSgu).length
+          } usuários`
+        );
+      } catch (error) {
+        console.error("Erro ao buscar departamentos SGU:", error);
+        // Continua sem os departamentos SGU
+      }
+    } else {
+      console.log("Nenhum usuário inativo encontrado, pulando busca SGU");
     }
 
     const summary = {

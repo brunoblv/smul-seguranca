@@ -98,6 +98,11 @@ export async function buscarDepartamentosSgu(
       throw new Error("Pool de conexão SGU não inicializado");
     }
 
+    // Se não há usernames, retornar objeto vazio
+    if (usernames.length === 0) {
+      return {};
+    }
+
     // Criar placeholders para o IN clause
     const placeholders = usernames.map(() => "?").join(",");
 
