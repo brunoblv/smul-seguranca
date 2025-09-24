@@ -1,281 +1,141 @@
 import { NextRequest, NextResponse } from "next/server";
+import ldap from "ldapjs";
 
-// OUs disponíveis para busca de usuários inativos - Prefeitura de São Paulo
-const AVAILABLE_OUS = [
-  {
-    dn: "OU=ADESAMPA,DC=rede,DC=sp",
-    name: "ADESAMPA",
-    description: "Agência de Desenvolvimento Econômico",
-  },
-  {
-    dn: "OU=AHM,DC=rede,DC=sp",
-    name: "AHM",
-    description: "Administração Hospitalar Municipal",
-  },
-  {
-    dn: "OU=AMLURB,DC=rede,DC=sp",
-    name: "AMLURB",
-    description: "Agência Metropolitana de Urbanismo",
-  },
-  {
-    dn: "OU=CET,DC=rede,DC=sp",
-    name: "CET",
-    description: "Companhia de Engenharia de Tráfego",
-  },
-  {
-    dn: "OU=CGM,DC=rede,DC=sp",
-    name: "CGM",
-    description: "Controladoria Geral do Município",
-  },
-  {
-    dn: "OU=CMSP,DC=rede,DC=sp",
-    name: "CMSP",
-    description: "Câmara Municipal de São Paulo",
-  },
-  {
-    dn: "OU=COHAB,DC=rede,DC=sp",
-    name: "COHAB",
-    description: "Companhia Metropolitana de Habitação",
-  },
-  {
-    dn: "OU=FPETC,DC=rede,DC=sp",
-    name: "FPETC",
-    description: "Fundação Paulistana de Educação, Tecnologia e Cultura",
-  },
-  {
-    dn: "OU=FTM,DC=rede,DC=sp",
-    name: "FTM",
-    description: "Fundação de Tecnologia da Informação",
-  },
-  {
-    dn: "OU=GIPB,DC=rede,DC=sp",
-    name: "GIPB",
-    description: "Gabinete do Prefeito",
-  },
-  {
-    dn: "OU=HSPM,DC=rede,DC=sp",
-    name: "HSPM",
-    description: "Hospital São Paulo Municipal",
-  },
-  {
-    dn: "OU=ILUME,DC=rede,DC=sp",
-    name: "ILUME",
-    description: "Instituto de Urbanismo e Meio Ambiente",
-  },
-  {
-    dn: "OU=IPREM,DC=rede,DC=sp",
-    name: "IPREM",
-    description: "Instituto de Previdência Municipal",
-  },
-  {
-    dn: "OU=PGM,DC=rede,DC=sp",
-    name: "PGM",
-    description: "Procuradoria Geral do Município",
-  },
-  {
-    dn: "OU=PRODAM,DC=rede,DC=sp",
-    name: "PRODAM",
-    description: "Empresa de Tecnologia da Informação e Comunicação",
-  },
-  {
-    dn: "OU=SECOM,DC=rede,DC=sp",
-    name: "SECOM",
-    description: "Secretaria de Comunicação",
-  },
-  {
-    dn: "OU=SEHAB,DC=rede,DC=sp",
-    name: "SEHAB",
-    description: "Secretaria de Habitação",
-  },
-  {
-    dn: "OU=SEME,DC=rede,DC=sp",
-    name: "SEME",
-    description: "Secretaria Municipal de Esportes",
-  },
-  {
-    dn: "OU=SF,DC=rede,DC=sp",
-    name: "SF",
-    description: "Secretaria de Finanças",
-  },
-  {
-    dn: "OU=SFMSP,DC=rede,DC=sp",
-    name: "SFMSP",
-    description: "Secretaria de Finanças Municipal",
-  },
-  {
-    dn: "OU=SGM,DC=rede,DC=sp",
-    name: "SGM",
-    description: "Secretaria de Gestão",
-  },
-  {
-    dn: "OU=SIURB,DC=rede,DC=sp",
-    name: "SIURB",
-    description: "Secretaria de Infraestrutura Urbana",
-  },
-  {
-    dn: "OU=SMADS,DC=rede,DC=sp",
-    name: "SMADS",
-    description: "Secretaria Municipal de Assistência e Desenvolvimento Social",
-  },
-  {
-    dn: "OU=SMC,DC=rede,DC=sp",
-    name: "SMC",
-    description: "Secretaria Municipal de Cultura",
-  },
-  {
-    dn: "OU=SMDET,DC=rede,DC=sp",
-    name: "SMDET",
-    description: "Secretaria Municipal de Desenvolvimento Econômico e Trabalho",
-  },
-  {
-    dn: "OU=SMDHC,DC=rede,DC=sp",
-    name: "SMDHC",
-    description: "Secretaria Municipal de Direitos Humanos e Cidadania",
-  },
-  {
-    dn: "OU=SMDP,DC=rede,DC=sp",
-    name: "SMDP",
-    description: "Secretaria Municipal de Desenvolvimento Urbano",
-  },
-  {
-    dn: "OU=SME,DC=rede,DC=sp",
-    name: "SME",
-    description: "Secretaria Municipal de Educação",
-  },
-  {
-    dn: "OU=SMG,DC=rede,DC=sp",
-    name: "SMG",
-    description: "Secretaria Municipal de Governo",
-  },
-  {
-    dn: "OU=SMIT,DC=rede,DC=sp",
-    name: "SMIT",
-    description: "Secretaria Municipal de Inovação e Tecnologia",
-  },
-  {
-    dn: "OU=SMJ,DC=rede,DC=sp",
-    name: "SMJ",
-    description: "Secretaria Municipal de Justiça",
-  },
-  {
-    dn: "OU=SMPED,DC=rede,DC=sp",
-    name: "SMPED",
-    description: "Secretaria Municipal de Pessoas com Deficiência",
-  },
-  {
-    dn: "OU=SMRG,DC=rede,DC=sp",
-    name: "SMRG",
-    description: "Secretaria Municipal de Relações Governamentais",
-  },
-  {
-    dn: "OU=SMRI,DC=rede,DC=sp",
-    name: "SMRI",
-    description: "Secretaria Municipal de Relações Internacionais",
-  },
-  {
-    dn: "OU=SMS,DC=rede,DC=sp",
-    name: "SMS",
-    description: "Secretaria Municipal de Saúde",
-  },
-  {
-    dn: "OU=SMSP,DC=rede,DC=sp",
-    name: "SMSP",
-    description: "Secretaria Municipal de Segurança Pública",
-  },
-  {
-    dn: "OU=SMSU,DC=rede,DC=sp",
-    name: "SMSU",
-    description: "Secretaria Municipal de Segurança Urbana",
-  },
-  {
-    dn: "OU=SMT,DC=rede,DC=sp",
-    name: "SMT",
-    description: "Secretaria Municipal de Transportes",
-  },
-  {
-    dn: "OU=SMTUR,DC=rede,DC=sp",
-    name: "SMTUR",
-    description: "Secretaria Municipal de Turismo",
-  },
-  {
-    dn: "OU=SMUL,DC=rede,DC=sp",
-    name: "SMUL",
-    description: "Secretaria Municipal de Urbanismo e Licenciamento",
-  },
-  {
-    dn: "OU=SPDA,DC=rede,DC=sp",
-    name: "SPDA",
-    description: "São Paulo Desenvolvimento",
-  },
-  {
-    dn: "OU=SPOBRAS,DC=rede,DC=sp",
-    name: "SPOBRAS",
-    description: "São Paulo Obras",
-  },
-  {
-    dn: "OU=SPP,DC=rede,DC=sp",
-    name: "SPP",
-    description: "São Paulo Parcerias",
-  },
-  {
-    dn: "OU=SPREGULA,DC=rede,DC=sp",
-    name: "SPREGULA",
-    description: "São Paulo Regulação",
-  },
-  {
-    dn: "OU=SPTRANS,DC=rede,DC=sp",
-    name: "SPTRANS",
-    description: "São Paulo Transportes",
-  },
-  {
-    dn: "OU=SPTURIS,DC=rede,DC=sp",
-    name: "SPTURIS",
-    description: "São Paulo Turismo",
-  },
-  {
-    dn: "OU=SPURBANISMO,DC=rede,DC=sp",
-    name: "SPURBANISMO",
-    description: "São Paulo Urbanismo",
-  },
-  {
-    dn: "OU=SVMA,DC=rede,DC=sp",
-    name: "SVMA",
-    description: "Secretaria do Verde e Meio Ambiente",
-  },
-  {
-    dn: "OU=TCMSP,DC=rede,DC=sp",
-    name: "TCMSP",
-    description: "Tribunal de Contas do Município",
-  },
-];
+// Configurações do LDAP
+const LDAP_CONFIG = {
+  url: process.env.LDAP_SERVER || "ldap://10.10.65.242",
+  baseDN: process.env.LDAP_BASE || "DC=rede,DC=sp",
+  bindDN: process.env.LDAP_USER || "usr_smdu_freenas",
+  bindPassword: process.env.LDAP_PASS || "Prodam01",
+  domain: process.env.LDAP_DOMAIN || "@rede.sp",
+  timeout: 5000,
+  connectTimeout: 10000,
+  idleTimeout: 10000,
+};
 
-interface OU {
-  dn: string;
+interface OUResult {
   name: string;
+  dn: string;
   description?: string;
+}
+
+async function searchOUs(): Promise<OUResult[]> {
+  return new Promise((resolve, reject) => {
+    console.log("[LDAP OUs] Iniciando busca por OUs...");
+
+    const client = ldap.createClient({
+      url: LDAP_CONFIG.url,
+      timeout: LDAP_CONFIG.timeout,
+      connectTimeout: LDAP_CONFIG.connectTimeout,
+      idleTimeout: LDAP_CONFIG.idleTimeout,
+    });
+
+    client.on("error", (err) => {
+      console.error("Erro na conexão LDAP:", err);
+      client.unbind();
+      reject(err);
+    });
+
+    // Timeout para evitar travamento
+    const timeout = setTimeout(() => {
+      console.error("Timeout na busca de OUs");
+      client.unbind();
+      reject(new Error("Timeout na busca de OUs"));
+    }, 15000);
+
+    const bindDN = LDAP_CONFIG.bindDN.includes("\\")
+      ? LDAP_CONFIG.bindDN
+      : LDAP_CONFIG.bindDN.includes("@")
+      ? LDAP_CONFIG.bindDN
+      : `${LDAP_CONFIG.bindDN}@${LDAP_CONFIG.domain.replace("@", "")}`;
+
+    client.bind(bindDN, LDAP_CONFIG.bindPassword, (err) => {
+      if (err) {
+        console.error("Erro na autenticação LDAP:", err);
+        clearTimeout(timeout);
+        client.unbind();
+        reject(err);
+        return;
+      }
+
+      const searchOptions: any = {
+        scope: "sub" as any,
+        filter: "(objectClass=organizationalUnit)",
+        attributes: ["ou", "description", "dn"],
+      };
+
+      client.search(LDAP_CONFIG.baseDN, searchOptions, (err, res) => {
+        if (err) {
+          console.error("Erro na busca de OUs:", err);
+          clearTimeout(timeout);
+          client.unbind();
+          reject(err);
+          return;
+        }
+
+        const ous: OUResult[] = [];
+
+        res.on("searchEntry", (entry) => {
+          const obj = entry.object;
+          if (obj.ou && obj.ou.length > 0) {
+            ous.push({
+              name: obj.ou[0],
+              dn: obj.dn,
+              description: obj.description ? obj.description[0] : undefined,
+            });
+          }
+        });
+
+        res.on("error", (err) => {
+          console.error("Erro na busca de OUs:", err);
+          clearTimeout(timeout);
+          client.unbind();
+          reject(err);
+        });
+
+        res.on("end", () => {
+          clearTimeout(timeout);
+          client.unbind();
+          console.log(`[LDAP OUs] Encontradas ${ous.length} OUs`);
+          resolve(ous);
+        });
+      });
+    });
+  });
 }
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("Listando OUs disponíveis para busca de usuários inativos...");
+    console.log("[LDAP OUs] Iniciando busca por OUs...");
 
-    const ous: OU[] = AVAILABLE_OUS;
+    const ous = await searchOUs();
 
-    console.log(`Retornando ${ous.length} OUs disponíveis`);
+    // Remover duplicatas baseadas no nome e ordenar
+    const uniqueOUs = ous.reduce((acc, current) => {
+      const existing = acc.find((ou) => ou.name === current.name);
+      if (!existing) {
+        acc.push(current);
+      }
+      return acc;
+    }, [] as OUResult[]);
+
+    // Ordenar OUs por nome
+    uniqueOUs.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
     return NextResponse.json({
-      ous,
-      total: ous.length,
-      source: "STATIC_OUS",
-      message: "OUs disponíveis para busca de usuários inativos",
+      success: true,
+      ous: uniqueOUs,
+      count: uniqueOUs.length,
     });
   } catch (error) {
-    console.error("Erro na API de listagem de OUs:", error);
+    console.error("Erro na API de busca de OUs:", error);
 
     return NextResponse.json(
       {
-        error: "Erro interno do servidor ao buscar OUs",
-        ous: [],
+        success: false,
+        error: `Erro interno do servidor: ${
+          error instanceof Error ? error.message : "Erro desconhecido"
+        }`,
       },
       { status: 500 }
     );

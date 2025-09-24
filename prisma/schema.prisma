@@ -222,3 +222,19 @@ model UsuarioPermissao {
     @@unique([usuario_id, permissao])
     @@map("usuario_permissoes")
 }
+
+model UnidadeOrganizacional {
+    id               Int      @id @default(autoincrement())
+    codigo           String   @unique
+    nome             String
+    descricao        String?
+    ativo            Boolean  @default(true)
+    ordem            Int      @default(0)
+    data_criacao     DateTime @default(now())
+    data_atualizacao DateTime @updatedAt
+
+    @@index([codigo])
+    @@index([ativo])
+    @@index([ordem])
+    @@map("unidades_organizacionais")
+}

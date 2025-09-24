@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { LogoutButton } from "@/components/logout-button";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -12,11 +13,15 @@ export function Navbar() {
       <div className="container flex h-16 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">S</span>
-            </div>
+            <Image
+              src="/escudo.png"
+              alt="Logo Segurança SMUL"
+              width={32}
+              height={32}
+              className="w-8 h-8"
+            />
             <span className="hidden font-bold sm:inline-block">
-              Segurança SMUL
+              SMUL - Segurança
             </span>
           </Link>
         </div>
@@ -64,6 +69,12 @@ export function Navbar() {
                 className="transition-colors hover:text-gray-900 text-gray-600"
               >
                 Comparação Mensal
+              </Link>
+              <Link
+                href="/gerenciar-ous"
+                className="transition-colors hover:text-gray-900 text-gray-600"
+              >
+                Gerenciar OUs
               </Link>
             </>
           )}

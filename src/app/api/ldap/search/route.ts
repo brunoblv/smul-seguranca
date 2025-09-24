@@ -17,6 +17,7 @@ const LDAP_CONFIG = {
 interface SearchRequest {
   searchType: "username" | "email" | "displayName";
   searchValue: string;
+  ouFilter?: string;
 }
 
 interface UserResult {
@@ -34,6 +35,7 @@ interface UserResult {
 
 // Função para escapar valores de filtro LDAP
 function escapeFilterValue(value: string): string {
+  // Escapar apenas os caracteres essenciais para LDAP
   return value
     .replace(/\\/g, "\\5c")
     .replace(/\(/g, "\\28")
@@ -53,15 +55,72 @@ function createLDAPFilter(searchType: string, searchValue: string): string {
     case "email":
       return `(mail=${escapedValue})`;
     case "displayName":
-      // Busca por nome completo usando displayName ou cn
-      return `(|(displayName=*${escapedValue}*)(cn=*${escapedValue}*))`;
+      // Para busca por nome, tentar busca exata primeiro
+      // Se não encontrar, o frontend pode tentar variações
+      return `(cn=${escapedValue})`;
     default:
       return `(sAMAccountName=${escapedValue})`;
   }
 }
 
-async function searchLDAP(filter: string): Promise<UserResult> {
+// Função para criar filtros alternativos para busca parcial
+function createPartialSearchFilters(searchValue: string): string[] {
+  const escapedValue = escapeFilterValue(searchValue);
+  const filters = [];
+
+  // Tentar diferentes combinações sem wildcards
+  filters.push(`(cn=${escapedValue})`);
+  filters.push(`(displayName=${escapedValue})`);
+  filters.push(`(givenName=${escapedValue})`);
+  filters.push(`(sn=${escapedValue})`);
+
+  // Se o valor contém espaço, tentar diferentes combinações
+  if (searchValue.includes(" ")) {
+    const parts = searchValue
+      .split(" ")
+      .filter((part) => part.trim().length > 0);
+
+    if (parts.length >= 2) {
+      const firstName = escapeFilterValue(parts[0]);
+
+      // Buscar por primeiro nome e qualquer parte do nome como sobrenome
+      for (let i = 1; i < parts.length; i++) {
+        const namePart = escapeFilterValue(parts[i]);
+        filters.push(`(&(givenName=${firstName})(sn=${namePart}))`);
+      }
+
+      // Buscar por primeiro nome e último sobrenome
+      const lastName = escapeFilterValue(parts[parts.length - 1]);
+      filters.push(`(&(givenName=${firstName})(sn=${lastName}))`);
+
+      // Buscar por primeiro nome e segundo nome
+      if (parts.length >= 2) {
+        const secondName = escapeFilterValue(parts[1]);
+        filters.push(`(&(givenName=${firstName})(sn=${secondName}))`);
+      }
+
+      // Buscar por primeiro nome em givenName e qualquer parte do nome em displayName
+      for (let i = 1; i < parts.length; i++) {
+        const namePart = escapeFilterValue(parts[i]);
+        filters.push(`(&(givenName=${firstName})(displayName=*${namePart}*))`);
+      }
+    }
+  }
+
+  return filters;
+}
+
+async function searchLDAP(
+  filter: string,
+  ouFilter?: string
+): Promise<UserResult> {
   return new Promise((resolve, reject) => {
+    console.log(
+      `[LDAP Search] Iniciando busca com filtro: ${filter}${
+        ouFilter ? `, OU: ${ouFilter}` : ""
+      }`
+    );
+
     const client = ldap.createClient({
       url: LDAP_CONFIG.url,
       timeout: LDAP_CONFIG.timeout,
@@ -71,6 +130,7 @@ async function searchLDAP(filter: string): Promise<UserResult> {
 
     client.on("error", (err) => {
       console.error("Erro na conexão LDAP:", err);
+      client.unbind();
       reject(err);
     });
 
@@ -81,12 +141,27 @@ async function searchLDAP(filter: string): Promise<UserResult> {
       ? LDAP_CONFIG.bindDN
       : `${LDAP_CONFIG.bindDN}@${LDAP_CONFIG.domain.replace("@", "")}`;
 
+    // Timeout para evitar travamento
+    const timeout = setTimeout(() => {
+      console.error("Timeout na busca LDAP");
+      client.unbind();
+      reject(new Error("Timeout na busca LDAP"));
+    }, 15000);
+
     client.bind(bindDN, LDAP_CONFIG.bindPassword, (err) => {
       if (err) {
         console.error("Erro na autenticação LDAP:", err);
+        clearTimeout(timeout);
         client.unbind();
         reject(err);
         return;
+      }
+
+      // Determinar a base DN baseada no filtro de OU
+      let searchBase = LDAP_CONFIG.baseDN;
+      if (ouFilter) {
+        // Se um filtro de OU foi especificado, buscar apenas nessa OU
+        searchBase = `OU=${ouFilter},${LDAP_CONFIG.baseDN}`;
       }
 
       const searchOptions: any = {
@@ -111,9 +186,10 @@ async function searchLDAP(filter: string): Promise<UserResult> {
         ],
       };
 
-      client.search(LDAP_CONFIG.baseDN, searchOptions, (err, res) => {
+      client.search(searchBase, searchOptions, (err, res) => {
         if (err) {
           console.error("Erro na busca LDAP:", err);
+          clearTimeout(timeout);
           client.unbind();
           reject(err);
           return;
@@ -129,11 +205,13 @@ async function searchLDAP(filter: string): Promise<UserResult> {
 
         res.on("error", (err) => {
           console.error("Erro na busca LDAP:", err);
+          clearTimeout(timeout);
           client.unbind();
           reject(err);
         });
 
         res.on("end", async () => {
+          clearTimeout(timeout);
           client.unbind();
 
           if (found) {
@@ -213,7 +291,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body: SearchRequest = await request.json();
-    const { searchType, searchValue } = body;
+    const { searchType, searchValue, ouFilter } = body;
+
+    console.log(
+      `[LDAP Search] Tipo: ${searchType}, Valor: ${searchValue}${
+        ouFilter ? `, OU: ${ouFilter}` : ""
+      }`
+    );
 
     if (!searchType || !searchValue) {
       return NextResponse.json(
@@ -237,20 +321,70 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cria o filtro LDAP
-    const filter = createLDAPFilter(searchType, searchValue);
+    // Para busca por nome, tentar múltiplos filtros e coletar todos os resultados
+    if (searchType === "displayName") {
+      const filters = createPartialSearchFilters(searchValue);
+      console.log(
+        `[LDAP Search] Tentando ${filters.length} filtros para busca por nome`
+      );
 
-    // Realiza a busca
-    const result = await searchLDAP(filter);
+      const allResults: UserResult[] = [];
+      const foundUsernames = new Set<string>();
 
-    return NextResponse.json(result);
+      for (const filter of filters) {
+        console.log(`[LDAP Search] Tentando filtro: ${filter}`);
+        try {
+          const result = await searchLDAP(filter, ouFilter);
+          if (
+            result.exists &&
+            result.username &&
+            !foundUsernames.has(result.username)
+          ) {
+            console.log(
+              `[LDAP Search] Usuário encontrado com filtro: ${filter}`
+            );
+            allResults.push(result);
+            foundUsernames.add(result.username);
+          }
+        } catch (error) {
+          console.log(`[LDAP Search] Erro com filtro ${filter}:`, error);
+          // Continua para o próximo filtro
+        }
+      }
+
+      // Se encontrou usuários, retornar array de resultados
+      if (allResults.length > 0) {
+        return NextResponse.json({
+          multiple: true,
+          results: allResults,
+          count: allResults.length,
+        });
+      }
+
+      // Se nenhum filtro funcionou, retornar não encontrado
+      return NextResponse.json({
+        exists: false,
+      });
+    } else {
+      // Para username e email, usar filtro único
+      const filter = createLDAPFilter(searchType, searchValue);
+      console.log(`[LDAP Search] Filtro gerado: ${filter}`);
+
+      // Realiza a busca
+      const result = await searchLDAP(filter, ouFilter);
+      console.log(`[LDAP Search] Resultado:`, result);
+
+      return NextResponse.json(result);
+    }
   } catch (error) {
     console.error("Erro na API de busca LDAP:", error);
 
     return NextResponse.json(
       {
         exists: false,
-        error: "Erro interno do servidor ao conectar com LDAP",
+        error: `Erro interno do servidor: ${
+          error instanceof Error ? error.message : "Erro desconhecido"
+        }`,
       },
       { status: 500 }
     );

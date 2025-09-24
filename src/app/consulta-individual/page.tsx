@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import {
   Card,
@@ -29,6 +30,7 @@ import {
   AlertCircle,
   Info,
 } from "lucide-react";
+import { SimpleModal } from "@/components/simple-modal";
 
 interface UserResult {
   exists: boolean;
@@ -46,15 +48,61 @@ export default function ConsultaIndividual() {
     "username" | "email" | "displayName"
   >("username");
   const [searchValue, setSearchValue] = useState("");
+  const [selectedOU, setSelectedOU] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<UserResult | null>(null);
+  const [multipleResults, setMultipleResults] = useState<UserResult[]>([]);
+  const [showSelectionModal, setShowSelectionModal] = useState(false);
+  const [ous, setOus] = useState<
+    Array<{
+      id: number;
+      codigo: string;
+      nome: string;
+      descricao?: string;
+      ativo: boolean;
+      ordem: number;
+    }>
+  >([]);
+  const [loadingOUs, setLoadingOUs] = useState(false);
+
+  // Carregar OUs quando o componente monta
+  React.useEffect(() => {
+    const loadOUs = async () => {
+      setLoadingOUs(true);
+      try {
+        const response = await fetch(
+          "/api/unidades-organizacionais?ativo=true"
+        );
+        const data = await response.json();
+        if (data.success) {
+          setOus(data.unidades);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar OUs:", error);
+      } finally {
+        setLoadingOUs(false);
+      }
+    };
+    loadOUs();
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchValue.trim()) return;
 
+    // Validação adicional
+    if (searchValue.trim().length < 2) {
+      setResult({
+        exists: false,
+        error: "Digite pelo menos 2 caracteres para buscar",
+      });
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
+    setMultipleResults([]);
+    setShowSelectionModal(false);
 
     try {
       const response = await fetch("/api/ldap/search", {
@@ -65,12 +113,36 @@ export default function ConsultaIndividual() {
         body: JSON.stringify({
           searchType,
           searchValue: searchValue.trim(),
+          ouFilter: selectedOU && selectedOU !== "all" ? selectedOU : undefined,
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        setResult({
+          exists: false,
+          error:
+            errorData.error ||
+            `Erro ${response.status}: ${response.statusText}`,
+        });
+        return;
+      }
+
       const data = await response.json();
-      setResult(data);
-    } catch {
+
+      // Verificar se há múltiplos resultados
+      if (data.multiple && data.results && data.results.length > 1) {
+        setMultipleResults(data.results);
+        setShowSelectionModal(true);
+      } else if (data.multiple && data.results && data.results.length === 1) {
+        // Se há apenas um resultado, mostrar diretamente
+        setResult(data.results[0]);
+      } else {
+        // Resultado único ou não encontrado
+        setResult(data);
+      }
+    } catch (error) {
+      console.error("Erro na busca:", error);
       setResult({
         exists: false,
         error: "Erro ao conectar com o servidor LDAP",
@@ -78,6 +150,16 @@ export default function ConsultaIndividual() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSelectUser = (user: UserResult) => {
+    setResult(user);
+    setShowSelectionModal(false);
+  };
+
+  const handleCloseModal = () => {
+    setShowSelectionModal(false);
+    setMultipleResults([]);
   };
 
   const getSearchTypeLabel = (type: string) => {
@@ -148,6 +230,35 @@ export default function ConsultaIndividual() {
                       <SelectItem value="username">Usuário de Rede</SelectItem>
                       <SelectItem value="email">E-mail</SelectItem>
                       <SelectItem value="displayName">Nome Completo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="ouFilter"
+                    className="text-sm font-medium text-slate-700"
+                  >
+                    Filtrar por Unidade Organizacional (Opcional)
+                  </label>
+                  <Select value={selectedOU} onValueChange={setSelectedOU}>
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          loadingOUs
+                            ? "Carregando OUs..."
+                            : "Selecione uma OU (opcional)"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as OUs</SelectItem>
+                      {ous.map((ou, index) => (
+                        <SelectItem key={`${ou.id}-${index}`} value={ou.codigo}>
+                          {ou.codigo} - {ou.nome}
+                          {ou.descricao && ` (${ou.descricao})`}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -368,6 +479,15 @@ export default function ConsultaIndividual() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Modal de Seleção de Usuários */}
+        <SimpleModal
+          isOpen={showSelectionModal}
+          onClose={handleCloseModal}
+          users={multipleResults}
+          onSelectUser={handleSelectUser}
+          searchValue={searchValue}
+        />
       </div>
     </div>
   );
