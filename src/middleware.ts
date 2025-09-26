@@ -8,8 +8,10 @@ const publicRoutes = ["/login", "/api/auth/login", "/api/auth/logout"];
 const protectedRoutes = [
   "/gerenciar-tickets",
   "/gerenciar-usuarios",
+  "/usuarios-smul",
   "/api/tickets",
   "/api/usuarios",
+  "/api/usuarios-smul",
 ];
 
 export function middleware(request: NextRequest) {

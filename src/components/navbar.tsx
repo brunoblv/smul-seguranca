@@ -80,6 +80,12 @@ export function Navbar() {
               >
                 Gerenciar OUs
               </Link>
+              <Link
+                href="/usuarios-smul"
+                className="transition-colors hover:text-gray-900 text-gray-600 whitespace-nowrap"
+              >
+                Usuários SMUL
+              </Link>
             </>
           )}
           <LogoutButton />
